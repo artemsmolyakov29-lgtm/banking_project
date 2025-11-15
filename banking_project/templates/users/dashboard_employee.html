@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}Панель сотрудника{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Панель сотрудника</h1>
+        <div class="text-end">
+            <p class="mb-0">Добро пожаловать, {{ user.get_full_name|default:user.username }}</p>
+            <small class="text-muted">Сотрудник</small>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ employee_stats.new_clients_today }}</h4>
+                    <p class="mb-0">Новых клиентов</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ employee_stats.pending_applications }}</h4>
+                    <p class="mb-0">Заявок на рассмотрении</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ employee_stats.completed_tasks }}</h4>
+                    <p class="mb-0">Выполнено задач</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4>{{ employee_stats.pending_transactions }}</h4>
+                    <p class="mb-0">Транзакций в обработке</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Требуют внимания</h5>
+                </div>
+                <div class="card-body">
+                    {% if attention_items %}
+                    <div class="list-group list-group-flush">
+                        {% for item in attention_items %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ item.title }}</h6>
+                                <small class="text-muted">{{ item.description }}</small>
+                            </div>
+                            <span class="badge bg-{{ item.priority_class }}">{{ item.get_priority_display }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Нет задач, требующих внимания</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Последние клиенты</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_clients %}
+                    <div class="list-group list-group-flush">
+                        {% for client in recent_clients %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ client.get_full_name }}</h6>
+                                <small class="text-muted">{{ client.email }}</small>
+                            </div>
+                            <small class="text-muted">{{ client.created_at|date:"d.m.Y" }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <a href="{% url 'clients:client_list' %}" class="btn btn-outline-primary btn-sm mt-3">
+                        Все клиенты
+                    </a>
+                    {% else %}
+                    <p class="text-muted">Клиенты отсутствуют</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Мои задачи</h5>
+                </div>
+                <div class="card-body">
+                    {% if tasks %}
+                    <div class="list-group list-group-flush">
+                        {% for task in tasks %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ task.title }}</h6>
+                                <small class="text-muted">{{ task.due_date|date:"d.m.Y" }}</small>
+                            </div>
+                            <p class="mb-1">{{ task.description|truncatewords:10 }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">{{ task.get_status_display }}</small>
+                                <span class="badge bg-{{ task.priority_class }}">{{ task.get_priority_display }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Нет назначенных задач</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Быстрые действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{% url 'clients:client_create' %}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-user-plus"></i> Новый клиент
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'accounts:account_create' %}" class="btn btn-outline-success w-100 mb-2">
+                                <i class="fas fa-plus"></i> Новый счет
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'credits:credit_apply' %}" class="btn btn-outline-info w-100 mb-2">
+                                <i class="fas fa-credit-card"></i> Кредитная заявка
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'deposits:deposit_open' %}" class="btn btn-outline-warning w-100 mb-2">
+                                <i class="fas fa-piggy-bank"></i> Открыть депозит
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'transactions:transaction_list' %}" class="btn btn-outline-secondary w-100 mb-2">
+                                <i class="fas fa-exchange-alt"></i> Транзакции
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'users:profile' %}" class="btn btn-outline-dark w-100 mb-2">
+                                <i class="fas fa-user"></i> Профиль
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

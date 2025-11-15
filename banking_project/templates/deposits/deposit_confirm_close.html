@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Закрытие депозита{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">Подтверждение закрытия депозита</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        Вы собираетесь закрыть депозитный счет. Эта операция не может быть отменена.
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>Информация о депозите:</h6>
+                            <p><strong>Номер счета:</strong> {{ deposit.account.account_number }}</p>
+                            <p><strong>Клиент:</strong> {{ deposit.account.client.get_full_name }}</p>
+                            <p><strong>Тип депозита:</strong> {{ deposit.get_deposit_type_display }}</p>
+                            <p><strong>Текущий баланс:</strong> {{ deposit.current_balance }} {{ deposit.currency }}</p>
+                            <p><strong>Накопленные проценты:</strong> {{ deposit.accrued_interest }} {{ deposit.currency }}</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина закрытия</label>
+                            <select class="form-select" name="close_reason" required>
+                                <option value="">Выберите причину</option>
+                                <option value="MATURITY">Окончание срока</option>
+                                <option value="CLIENT_REQUEST">По запросу клиента</option>
+                                <option value="EARLY_CLOSURE">Досрочное закрытие</option>
+                                <option value="OTHER">Другая причина</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3" placeholder="Дополнительная информация"></textarea>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="transfer_balance" id="transfer_balance" checked>
+                            <label class="form-check-label" for="transfer_balance">
+                                Перевести средства на основной счет клиента
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'deposits:deposit_detail' deposit.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-warning">Закрыть депозит</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

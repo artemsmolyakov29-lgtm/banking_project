@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Кредитные продукты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Кредитные продукты</h1>
+    </div>
+
+    <div class="row">
+        {% for product in products %}
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{{ product.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ product.description }}</p>
+
+                    <div class="mb-3">
+                        <strong>Процентная ставка:</strong> от {{ product.min_interest_rate }}%
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Сумма:</strong> до {{ product.max_amount }} RUB
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Срок:</strong> до {{ product.max_term }} месяцев
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Требования:</strong>
+                        <ul class="small">
+                            <li>Возраст: от {{ product.min_age }} лет</li>
+                            <li>Стаж работы: от {{ product.min_work_experience }} месяцев</li>
+                            {% if product.requires_collateral %}
+                            <li>Требуется залог</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'credits:credit_apply' %}?product={{ product.id }}" class="btn btn-primary w-100">
+                        Подать заявку
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-4">
+                    <p class="text-muted">Кредитные продукты отсутствуют</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

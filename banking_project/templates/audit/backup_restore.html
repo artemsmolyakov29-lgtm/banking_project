@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Восстановление из резервной копии{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Восстановление данных из резервной копии</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Внимание!</h6>
+                        <p class="mb-0">
+                            Восстановление данных из резервной копии приведет к <strong>полной замене текущих данных</strong>.
+                            Эта операция не может быть отменена. Рекомендуется создать резервную копию текущих данных перед восстановлением.
+                        </p>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Информация о резервной копии</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Название:</strong> {{ backup.name }}<br>
+                                    <strong>Дата создания:</strong> {{ backup.created_at|date:"d.m.Y H:i" }}<br>
+                                    <strong>Размер:</strong> {{ backup.size|filesizeformat }}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Тип:</strong> {{ backup.get_backup_type_display }}<br>
+                                    <strong>Статус:</strong>
+                                    <span class="badge bg-{% if backup.status == 'SUCCESS' %}success{% else %}warning{% endif %}">
+                                        {{ backup.get_status_display }}
+                                    </span><br>
+                                    {% if backup.description %}
+                                    <strong>Описание:</strong> {{ backup.description }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="confirmation_text" class="form-label">
+                                Для подтверждения введите "ВОССТАНОВИТЬ" в поле ниже:
+                            </label>
+                            <input type="text" class="form-control" id="confirmation_text" name="confirmation_text"
+                                   required pattern="ВОССТАНОВИТЬ">
+                            <div class="form-text">Это действие требует явного подтверждения</div>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="create_backup" name="create_backup" checked>
+                            <label class="form-check-label" for="create_backup">
+                                Создать резервную копию текущих данных перед восстановлением
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'audit:backup_list' %}" class="btn btn-secondary me-md-2">Отмена</a>
+                            <button type="submit" class="btn btn-danger"
+                                    onclick="return confirm('Вы уверены, что хотите восстановить данные из этой резервной копии?')">
+                                <i class="fas fa-redo"></i> Восстановить данные
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmationInput = document.getElementById('confirmation_text');
+    const submitButton = document.querySelector('button[type="submit"]');
+
+    function validateConfirmation() {
+        if (confirmationInput.value === 'ВОССТАНОВИТЬ') {
+            submitButton.disabled = false;
+        } else {
+            submitButton.disabled = true;
+        }
+    }
+
+    confirmationInput.addEventListener('input', validateConfirmation);
+    validateConfirmation(); // Initial check
+});
+</script>
+{% endblock %}

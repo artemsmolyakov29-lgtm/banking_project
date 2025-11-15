@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Кредиты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Управление кредитами</h1>
+        <a href="{% url 'credits:credit_apply' %}" class="btn btn-primary">
+            Оформить кредит
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Список кредитов</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Клиент</th>
+                            <th>Сумма</th>
+                            <th>Ставка</th>
+                            <th>Срок</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for credit in credits %}
+                        <tr>
+                            <td>{{ credit.id }}</td>
+                            <td>{{ credit.client.get_full_name }}</td>
+                            <td>{{ credit.amount }} RUB</td>
+                            <td>{{ credit.interest_rate }}%</td>
+                            <td>{{ credit.term }} мес.</td>
+                            <td>
+                                {% if credit.status == 'PENDING' %}
+                                <span class="badge bg-warning">На рассмотрении</span>
+                                {% elif credit.status == 'APPROVED' %}
+                                <span class="badge bg-success">Одобрен</span>
+                                {% elif credit.status == 'ACTIVE' %}
+                                <span class="badge bg-primary">Активен</span>
+                                {% elif credit.status == 'CLOSED' %}
+                                <span class="badge bg-secondary">Закрыт</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ credit.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-sm btn-outline-primary">
+                                    Просмотр
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                Кредиты не найдены
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

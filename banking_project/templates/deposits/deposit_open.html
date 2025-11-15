@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Открытие депозита{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Открытие депозитного счета</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Клиент</label>
+                                    <select class="form-select" name="client" required>
+                                        <option value="">Выберите клиента</option>
+                                        {% for client in clients %}
+                                        <option value="{{ client.id }}">{{ client.get_full_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Тип депозита</label>
+                                    <select class="form-select" name="deposit_type" required>
+                                        <option value="">Выберите тип</option>
+                                        <option value="DEMAND">До востребования</option>
+                                        <option value="TERM">Срочный</option>
+                                        <option value="SAVINGS">Сберегательный</option>
+                                        <option value="CUMULATIVE">Накопительный</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Сумма депозита</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="amount" required min="1000" step="1000">
+                                        <span class="input-group-text">RUB</span>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Срок депозита</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="term" required min="1" max="60">
+                                        <span class="input-group-text">мес.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Процентная ставка</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="interest_rate" required min="0.1" max="20" step="0.1">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Валюта</label>
+                                    <select class="form-select" name="currency" required>
+                                        <option value="RUB">RUB - Российский рубль</option>
+                                        <option value="USD">USD - Доллар США</option>
+                                        <option value="EUR">EUR - Евро</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Частота начисления процентов</label>
+                                    <select class="form-select" name="interest_frequency" required>
+                                        <option value="MONTHLY">Ежемесячно</option>
+                                        <option value="QUARTERLY">Ежеквартально</option>
+                                        <option value="ANNUALLY">Ежегодно</option>
+                                        <option value="AT_END">В конце срока</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" name="capitalization" id="capitalization">
+                                        <label class="form-check-label" for="capitalization">Капитализация процентов</label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" name="replenishment" id="replenishment">
+                                        <label class="form-check-label" for="replenishment">Разрешить пополнение</label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" name="withdrawal" id="withdrawal">
+                                        <label class="form-check-label" for="withdrawal">Разрешить частичное снятие</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Примечание</label>
+                            <textarea class="form-control" name="notes" rows="3" placeholder="Дополнительная информация о депозите"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'deposits:deposit_list' %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">Открыть депозит</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

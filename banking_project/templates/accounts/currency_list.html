@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}Валюты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Управление валютами</h1>
+    </div>
+
+    <div class="row">
+        {% for currency in currencies %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ currency.name }} ({{ currency.code }})</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Курс к RUB:</strong> {{ currency.rate_to_rub }}</p>
+                    <p><strong>Символ:</strong> {{ currency.symbol }}</p>
+                    <p><strong>Статус:</strong>
+                        {% if currency.is_active %}
+                        <span class="badge bg-success">Активна</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Неактивна</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Последнее обновление:</strong><br>{{ currency.updated_at|date:"d.m.Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-4">
+                    <p class="text-muted">Валюты не найдены</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Курсы валют</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Валюта</th>
+                            <th>Код</th>
+                            <th>Курс к RUB</th>
+                            <th>Изменение</th>
+                            <th>Дата обновления</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rate in exchange_rates %}
+                        <tr>
+                            <td>{{ rate.currency_name }}</td>
+                            <td>{{ rate.currency_code }}</td>
+                            <td>{{ rate.rate }}</td>
+                            <td class="{% if rate.change > 0 %}text-success{% elif rate.change < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                {{ rate.change }}%
+                            </td>
+                            <td>{{ rate.updated_at|date:"d.m.Y H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4">Курсы валют не найдены</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

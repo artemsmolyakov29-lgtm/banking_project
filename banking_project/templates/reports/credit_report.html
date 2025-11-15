@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Отчет по кредитам{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Отчет по кредитам</h1>
+        <div>
+            <a href="?export=pdf" class="btn btn-danger me-2">PDF</a>
+            <a href="?export=excel" class="btn btn-success">Excel</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Фильтры отчета</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Дата с</label>
+                    <input type="date" class="form-control" name="start_date" value="{{ request.GET.start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Дата по</label>
+                    <input type="date" class="form-control" name="end_date" value="{{ request.GET.end_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Статус кредита</label>
+                    <select class="form-select" name="status">
+                        <option value="">Все статусы</option>
+                        <option value="active" {% if request.GET.status =='active' %}selected{% endif %}>Активные</option>
+                        <option value="closed" {% if request.GET.status =='closed' %}selected{% endif %}>Закрытые</option>
+                        <option value="overdue" {% if request.GET.status =='overdue' %}selected{% endif %}>Просроченные</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Тип кредита</label>
+                    <select class="form-select" name="credit_type">
+                        <option value="">Все типы</option>
+                        <option value="PERSONAL" {% if request.GET.credit_type =='PERSONAL' %}selected{% endif %}>Потребительский</option>
+                        <option value="MORTGAGE" {% if request.GET.credit_type =='MORTGAGE' %}selected{% endif %}>Ипотека</option>
+                        <option value="AUTO" {% if request.GET.credit_type =='AUTO' %}selected{% endif %}>Автокредит</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Сформировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_credits }}</h4>
+                    <small>Всего кредитов</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ active_credits }}</h4>
+                    <small>Активных кредитов</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4>{{ overdue_credits }}</h4>
+                    <small>Просроченных</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_credit_amount }}</h4>
+                    <small>Общая сумма (RUB)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Детальный отчет по кредитам</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Номер кредита</th>
+                            <th>Клиент</th>
+                            <th>Тип кредита</th>
+                            <th>Сумма</th>
+                            <th>Остаток</th>
+                            <th>Ставка</th>
+                            <th>Статус</th>
+                            <th>Дата выдачи</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for credit in credits %}
+                        <tr>
+                            <td>{{ credit.credit_number }}</td>
+                            <td>{{ credit.client.get_full_name }}</td>
+                            <td>{{ credit.get_credit_type_display }}</td>
+                            <td>{{ credit.amount }} RUB</td>
+                            <td>{{ credit.remaining_amount }} RUB</td>
+                            <td>{{ credit.interest_rate }}%</td>
+                            <td>
+                                {% if credit.status == 'ACTIVE' %}
+                                <span class="badge bg-success">Активен</span>
+                                {% elif credit.status == 'CLOSED' %}
+                                <span class="badge bg-secondary">Закрыт</span>
+                                {% elif credit.status == 'OVERDUE' %}
+                                <span class="badge bg-danger">Просрочен</span>
+                                {% else %}
+                                <span class="badge bg-warning">{{ credit.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ credit.start_date|date:"d.m.Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">Кредиты не найдены</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

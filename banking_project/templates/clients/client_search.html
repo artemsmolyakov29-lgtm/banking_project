@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}Поиск клиента{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
+            <li class="breadcrumb-item active">Поиск клиента</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Поиск клиента</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'clients:client_search' %}">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Фамилия</label>
+                                <input type="text" class="form-control" name="last_name" value="{{ request.GET.last_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Имя</label>
+                                <input type="text" class="form-control" name="first_name" value="{{ request.GET.first_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Телефон</label>
+                                <input type="text" class="form-control" name="phone_number" value="{{ request.GET.phone_number }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="email" value="{{ request.GET.email }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Паспорт</label>
+                                <input type="text" class="form-control" name="passport_number" value="{{ request.GET.passport_number }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">ИНН</label>
+                                <input type="text" class="form-control" name="tax_id" value="{{ request.GET.tax_id }}">
+                            </div>
+                            <div class="col-12">
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-info">Найти</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {% if search_performed %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Результаты поиска</h5>
+                </div>
+                <div class="card-body">
+                    {% if search_results %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ФИО</th>
+                                    <th>Телефон</th>
+                                    <th>Email</th>
+                                    <th>Паспорт</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client in search_results %}
+                                <tr>
+                                    <td>{{ client.get_full_name }}</td>
+                                    <td>{{ client.phone_number }}</td>
+                                    <td>{{ client.email }}</td>
+                                    <td>{{ client.passport_number }}</td>
+                                    <td>
+                                        <a href="{% url 'clients:client_detail' client.id %}" class="btn btn-sm btn-outline-primary">
+                                            Просмотр
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">Клиенты по заданным критериям не найдены</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

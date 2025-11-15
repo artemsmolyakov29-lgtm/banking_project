@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}Платежи по кредиту{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит #{{ credit.id }}</a></li>
+            <li class="breadcrumb-item active">Платежи</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">История платежей</h5>
+                </div>
+                <div class="card-body">
+                    {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Сумма</th>
+                                    <th>Тип</th>
+                                    <th>Статус</th>
+                                    <th>Комментарий</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td>{{ payment.payment_date|date:"d.m.Y" }}</td>
+                                    <td>{{ payment.amount }} RUB</td>
+                                    <td>{{ payment.get_payment_type_display }}</td>
+                                    <td>
+                                        {% if payment.status == 'PAID' %}
+                                        <span class="badge bg-success">Оплачен</span>
+                                        {% elif payment.status == 'PENDING' %}
+                                        <span class="badge bg-warning">Ожидает</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">{{ payment.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ payment.comment|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">Платежи отсутствуют</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Статистика платежей</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Всего выплачено:</strong> {{ total_paid }} RUB</p>
+                    <p><strong>Остаток долга:</strong> {{ credit.remaining_amount }} RUB</p>
+                    <p><strong>Количество платежей:</strong> {{ payments.count }}</p>
+                    <p><strong>Последний платеж:</strong><br>{{ last_payment.payment_date|date:"d.m.Y" }}</p>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-outline-primary">
+                            Назад к кредиту
+                        </a>
+                        <a href="{% url 'credits:credit_payment_form' credit.id %}" class="btn btn-success">
+                            Внести платеж
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

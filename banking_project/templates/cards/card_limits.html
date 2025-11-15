@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Изменение лимитов карты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Управление лимитами карты</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Номер карты:</strong> **** **** **** {{ card.last_four_digits }}</p>
+                    <p><strong>Держатель:</strong> {{ card.account.client.get_full_name }}</p>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Дневной лимит</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">{{ card.currency }}</span>
+                                        {{ form.daily_limit }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Месячный лимит</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">{{ card.currency }}</span>
+                                        {{ form.monthly_limit }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Лимит операции</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">{{ card.currency }}</span>
+                                        {{ form.transaction_limit }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина изменения</label>
+                            {{ form.limit_change_reason }}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'cards:card_detail' card.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">
+                                Сохранить лимиты
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

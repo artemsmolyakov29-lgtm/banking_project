@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Разблокировка карты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Подтверждение разблокировки карты</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        После разблокировки карта снова будет доступна для использования.
+                    </div>
+
+                    <p><strong>Номер карты:</strong> **** **** **** {{ card.last_four_digits }}</p>
+                    <p><strong>Держатель:</strong> {{ card.account.client.get_full_name }}</p>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина разблокировки</label>
+                            <select class="form-select" name="unblock_reason" required>
+                                <option value="">Выберите причину</option>
+                                <option value="FOUND">Карта найдена</option>
+                                <option value="FALSE_ALARM">Ложное срабатывание</option>
+                                <option value="CLIENT_REQUEST">По запросу клиента</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'cards:card_detail' card.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-success">
+                                Разблокировать карту
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

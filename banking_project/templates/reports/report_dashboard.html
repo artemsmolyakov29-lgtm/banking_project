@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Дашборд отчетов{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Дашборд отчетов</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h2>{{ total_clients }}</h2>
+                    <p>Клиентов</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h2>{{ total_credits }}</h2>
+                    <p>Кредитов</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h2>{{ total_deposits }}</h2>
+                    <p>Депозитов</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h2>{{ total_transactions }}</h2>
+                    <p>Транзакций</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Быстрые отчеты</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <a href="{% url 'reports:client_report' %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Отчет по клиентам</h6>
+                                <small class="text-muted">Клиенты</small>
+                            </div>
+                            <p class="mb-1">Статистика по клиентам банка</p>
+                        </a>
+                        <a href="{% url 'reports:credit_report' %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Отчет по кредитам</h6>
+                                <small class="text-muted">Кредиты</small>
+                            </div>
+                            <p class="mb-1">Анализ кредитного портфеля</p>
+                        </a>
+                        <a href="{% url 'reports:deposit_report' %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Отчет по депозитам</h6>
+                                <small class="text-muted">Депозиты</small>
+                            </div>
+                            <p class="mb-1">Статистика депозитных продуктов</p>
+                        </a>
+                        <a href="{% url 'reports:transaction_report' %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Отчет по транзакциям</h6>
+                                <small class="text-muted">Транзакции</small>
+                            </div>
+                            <p class="mb-1">Анализ финансовых операций</p>
+                        </a>
+                        <a href="{% url 'reports:financial_report' %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Финансовый отчет</h6>
+                                <small class="text-muted">Финансы</small>
+                            </div>
+                            <p class="mb-1">Общая финансовая отчетность</p>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Последние отчеты</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_reports %}
+                    <div class="list-group">
+                        {% for report in recent_reports %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ report.name }}</h6>
+                                <small class="text-muted">{{ report.created_at|date:"d.m.Y" }}</small>
+                            </div>
+                            <p class="mb-1">{{ report.description }}</p>
+                            <small class="text-muted">Создал: {{ report.created_by.get_full_name }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Нет созданных отчетов</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Статистика за месяц</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <h4>{{ monthly_new_clients }}</h4>
+                            <small>Новых клиентов</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ monthly_credits }}</h4>
+                            <small>Выданных кредитов</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ monthly_deposits }}</h4>
+                            <small>Открытых депозитов</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ monthly_transactions }}</h4>
+                            <small>Транзакций</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ monthly_income }} RUB</h4>
+                            <small>Доход</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ monthly_profit }} RUB</h4>
+                            <small>Прибыль</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

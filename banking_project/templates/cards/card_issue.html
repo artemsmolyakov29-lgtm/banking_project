@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Оформление новой карты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Оформление новой банковской карты</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Счет</label>
+                                    {{ form.account }}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Тип карты</label>
+                                    {{ form.card_type }}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Платежная система</label>
+                                    {{ form.payment_system }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Адрес доставки</label>
+                                    {{ form.delivery_address }}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Причина выпуска</label>
+                                    {{ form.issue_reason }}
+                                </div>
+
+                                <div class="mb-3 form-check">
+                                    {{ form.express_issue }}
+                                    <label class="form-check-label">Срочный выпуск</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'cards:card_list' %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">
+                                Оформить карту
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

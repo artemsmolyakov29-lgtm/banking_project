@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Внесение платежа{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Внесение платежа по кредиту</h5>
+                </div>
+                <div class="card-body">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <p><strong>Клиент:</strong> {{ credit.client.get_full_name }}</p>
+                            <p><strong>Остаток долга:</strong> {{ credit.remaining_amount }} RUB</p>
+                            <p><strong>Ближайший платеж:</strong> {{ next_payment.amount }} RUB</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Сумма платежа</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="amount" value="{{ next_payment.amount }}" required min="1" step="0.01">
+                                <span class="input-group-text">RUB</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Дата платежа</label>
+                            <input type="date" class="form-control" name="payment_date" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Тип платежа</label>
+                            <select class="form-select" name="payment_type" required>
+                                <option value="REGULAR">Регулярный платеж</option>
+                                <option value="EARLY">Досрочное погашение</option>
+                                <option value="PARTIAL">Частичное погашение</option>
+                                <option value="PENALTY">Пени/штрафы</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-success">Внести платеж</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Операции по карте{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">История операций</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Тип</th>
+                                    <th>Описание</th>
+                                    <th>Сумма</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions %}
+                                <tr>
+                                    <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
+                                    <td>
+                                        {% if transaction.transaction_type == 'INCOME' %}
+                                        <span class="badge bg-success">Доход</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Расход</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ transaction.description|default:"-" }}</td>
+                                    <td>
+                                        {% if transaction.transaction_type == 'INCOME' %}+{% else %}-{% endif %}
+                                        {{ transaction.amount }} {{ card.currency }}
+                                    </td>
+                                    <td>
+                                        {% if transaction.status == 'COMPLETED' %}
+                                        <span class="badge bg-success">Завершена</span>
+                                        {% elif transaction.status == 'PENDING' %}
+                                        <span class="badge bg-warning">В обработке</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ transaction.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        Операции не найдены
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <p><strong>Номер карты:</strong><br>**** **** **** {{ card.last_four_digits }}</p>
+                    <p><strong>Держатель:</strong><br>{{ card.account.client.get_full_name }}</p>
+                    <p><strong>Баланс:</strong><br>{{ card.account.balance }} {{ card.currency }}</p>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'cards:card_detail' card.id %}" class="btn btn-outline-primary">
+                            Назад к карте
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

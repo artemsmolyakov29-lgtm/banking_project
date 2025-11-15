@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Отклонение кредита{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Отклонение кредитной заявки</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        Вы собираетесь отклонить кредитную заявку.
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>Информация о заявке:</h6>
+                            <p><strong>Клиент:</strong> {{ credit.client.get_full_name }}</p>
+                            <p><strong>Сумма:</strong> {{ credit.amount }} RUB</p>
+                            <p><strong>Срок:</strong> {{ credit.term }} месяцев</p>
+                            <p><strong>Цель:</strong> {{ credit.purpose }}</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина отказа</label>
+                            <select class="form-select" name="rejection_reason" required>
+                                <option value="">Выберите причину</option>
+                                <option value="CREDIT_HISTORY">Плохая кредитная история</option>
+                                <option value="INCOME">Недостаточный доход</option>
+                                <option value="DOCUMENTS">Неполный пакет документов</option>
+                                <option value="RISK">Высокий риск</option>
+                                <option value="OTHER">Другая причина</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Подробное объяснение</label>
+                            <textarea class="form-control" name="explanation" rows="4" required placeholder="Подробно объясните причину отказа"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Рекомендации клиенту</label>
+                            <textarea class="form-control" name="recommendations" rows="3" placeholder="Рекомендации для улучшения шансов одобрения"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-danger">Отклонить заявку</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

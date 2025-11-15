@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block title %}Мой профиль{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Мой профиль</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4 text-center">
+                            <div class="mb-3">
+                                <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
+                                    <i class="fas fa-user fa-3x text-muted"></i>
+                                </div>
+                            </div>
+                            <h5>{{ user.get_full_name|default:user.username }}</h5>
+                            <p class="text-muted">{{ user.get_role_display }}</p>
+                            <span class="badge bg-{% if user.is_active %}success{% else %}danger{% endif %}">
+                                {% if user.is_active %}Активен{% else %}Неактивен{% endif %}
+                            </span>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <p><strong>Имя пользователя:</strong><br>{{ user.username }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p><strong>Email:</strong><br>{{ user.email }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p><strong>Имя:</strong><br>{{ user.first_name|default:"Не указано" }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p><strong>Фамилия:</strong><br>{{ user.last_name|default:"Не указана" }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p><strong>Дата регистрации:</strong><br>{{ user.date_joined|date:"d.m.Y" }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p><strong>Последний вход:</strong><br>{{ user.last_login|date:"d.m.Y H:i" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Имя</label>
+                                    <input type="text" class="form-control" name="first_name" value="{{ user.first_name }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Фамилия</label>
+                                    <input type="text" class="form-control" name="last_name" value="{{ user.last_name }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Телефон</label>
+                            <input type="tel" class="form-control" name="phone" value="{{ user.phone|default:'' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Адрес</label>
+                            <textarea class="form-control" name="address" rows="3">{{ user.address|default:'' }}</textarea>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3">Смена пароля</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Текущий пароль</label>
+                                    <input type="password" class="form-control" name="current_password">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Новый пароль</label>
+                                    <input type="password" class="form-control" name="new_password">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Повторите пароль</label>
+                                    <input type="password" class="form-control" name="confirm_password">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <small>Оставьте поля пароля пустыми, если не хотите менять пароль.</small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% if user.role == 'CLIENT' %}{% url 'users:dashboard_client' %}{% elif user.role == 'EMPLOYEE' %}{% url 'users:dashboard_employee' %}{% else %}{% url 'users:dashboard' %}{% endif %}" class="btn btn-secondary me-md-2">
+                                Отмена
+                            </a>
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {% if user.role == 'CLIENT' and client_info %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Дополнительная информация</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Паспорт:</strong> {{ client_info.passport_number|default:"Не указан" }}</p>
+                            <p><strong>ИНН:</strong> {{ client_info.tax_id|default:"Не указан" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Дата рождения:</strong> {{ client_info.birth_date|date:"d.m.Y" }}</p>
+                            <p><strong>Адрес регистрации:</strong> {{ client_info.address|default:"Не указан" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Настройки безопасности</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
+                                <label class="form-check-label" for="emailNotifications">Email уведомления</label>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="smsNotifications">
+                                <label class="form-check-label" for="smsNotifications">SMS уведомления</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="twoFactorAuth">
+                                <label class="form-check-label" for="twoFactorAuth">Двухфакторная аутентификация</label>
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="activityAlerts" checked>
+                                <label class="form-check-label" for="activityAlerts">Оповещения о активности</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

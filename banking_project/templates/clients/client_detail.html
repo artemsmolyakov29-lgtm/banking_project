@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Клиент {{ client.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
+            <li class="breadcrumb-item active">{{ client.get_full_name }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Основная информация</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>ФИО:</strong><br>{{ client.get_full_name }}</p>
+                            <p><strong>Дата рождения:</strong><br>{{ client.birth_date|date:"d.m.Y" }}</p>
+                            <p><strong>Паспорт:</strong><br>{{ client.passport_number }}</p>
+                            <p><strong>ИНН:</strong><br>{{ client.tax_id }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Email:</strong><br>{{ client.email }}</p>
+                            <p><strong>Телефон:</strong><br>{{ client.phone_number }}</p>
+                            <p><strong>Статус:</strong><br>
+                                {% if client.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                                {% else %}
+                                <span class="badge bg-danger">Неактивен</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Дата регистрации:</strong><br>{{ client.created_at|date:"d.m.Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Счета</h6>
+                        </div>
+                        <div class="card-body">
+                            {% for account in client.accounts.all %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>{{ account.account_number }}</strong><br>
+                                    <small class="text-muted">{{ account.balance }} {{ account.currency }}</small>
+                                </div>
+                                <span class="badge bg-{% if account.is_active %}success{% else %}secondary{% endif %}">
+                                    {{ account.get_account_type_display }}
+                                </span>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted">Счета отсутствуют</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Кредиты</h6>
+                        </div>
+                        <div class="card-body">
+                            {% for credit in client.credits.all %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>{{ credit.credit_number }}</strong><br>
+                                    <small class="text-muted">{{ credit.remaining_amount }} {{ credit.currency }}</small>
+                                </div>
+                                <span class="badge bg-{% if credit.status == 'ACTIVE' %}success{% else %}warning{% endif %}">
+                                    {{ credit.get_status_display }}
+                                </span>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted">Кредиты отсутствуют</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'clients:client_update' client.id %}" class="btn btn-primary">
+                            Редактировать
+                        </a>
+                        <a href="{% url 'clients:client_contacts' client.id %}" class="btn btn-outline-info">
+                            Контакты
+                        </a>
+                        <a href="{% url 'clients:client_documents' client.id %}" class="btn btn-outline-warning">
+                            Документы
+                        </a>
+                        <a href="{% url 'accounts:account_create' %}?client={{ client.id }}" class="btn btn-outline-success">
+                            Открыть счет
+                        </a>
+                        <a href="{% url 'credits:credit_create' %}?client={{ client.id }}" class="btn btn-outline-secondary">
+                            Оформить кредит
+                        </a>
+                        {% if client.is_active %}
+                        <a href="{% url 'clients:client_confirm_delete' client.id %}" class="btn btn-outline-danger">
+                            Удалить
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Статистика</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Всего счетов:</strong> {{ client.accounts.count }}</p>
+                    <p><strong>Активных кредитов:</strong> {{ client.credits.active.count }}</p>
+                    <p><strong>Общий баланс:</strong> {{ client.total_balance }} RUB</p>
+                    <p><strong>Последняя активность:</strong><br>{{ client.last_activity|date:"d.m.Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

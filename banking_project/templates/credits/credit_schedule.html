@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}График платежей{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит #{{ credit.id }}</a></li>
+            <li class="breadcrumb-item active">График платежей</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">График платежей по кредиту</h5>
+                </div>
+                <div class="card-body">
+                    {% if schedule %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>№</th>
+                                    <th>Дата платежа</th>
+                                    <th>Сумма платежа</th>
+                                    <th>Основной долг</th>
+                                    <th>Проценты</th>
+                                    <th>Остаток долга</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in schedule %}
+                                <tr>
+                                    <td>{{ payment.payment_number }}</td>
+                                    <td>{{ payment.due_date|date:"d.m.Y" }}</td>
+                                    <td>{{ payment.amount }} RUB</td>
+                                    <td>{{ payment.principal }} RUB</td>
+                                    <td>{{ payment.interest }} RUB</td>
+                                    <td>{{ payment.remaining_balance }} RUB</td>
+                                    <td>
+                                        {% if payment.is_paid %}
+                                        <span class="badge bg-success">Оплачен</span>
+                                        {% elif payment.is_overdue %}
+                                        <span class="badge bg-danger">Просрочен</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Ожидает</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">График платежей отсутствует</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Общая сумма выплат:</strong> {{ total_payment_amount }} RUB</p>
+                    <p><strong>Сумма процентов:</strong> {{ total_interest }} RUB</p>
+                    <p><strong>Количество платежей:</strong> {{ schedule|length }}</p>
+                    <p><strong>Дата окончания:</strong><br>{{ end_date|date:"d.m.Y" }}</p>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-outline-primary">
+                            Назад к кредиту
+                        </a>
+                        <button class="btn btn-outline-success" onclick="window.print()">
+                            Распечатать график
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

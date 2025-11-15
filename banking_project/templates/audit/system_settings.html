@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Настройки системы{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Настройки системы</h1>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- Настройки безопасности -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Настройки безопасности</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="settings_type" value="security">
+
+                        <div class="mb-3">
+                            <label for="session_timeout" class="form-label">Таймаут сессии (минуты)</label>
+                            <input type="number" class="form-control" id="session_timeout" name="session_timeout"
+                                   value="{{ security_settings.session_timeout }}" min="5" max="1440">
+                            <div class="form-text">Время неактивности до автоматического выхода из системы</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="max_login_attempts" class="form-label">Максимум попыток входа</label>
+                            <input type="number" class="form-control" id="max_login_attempts" name="max_login_attempts"
+                                   value="{{ security_settings.max_login_attempts }}" min="1" max="10">
+                            <div class="form-text">Количество неудачных попыток перед блокировкой учетной записи</div>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="require_strong_passwords" name="require_strong_passwords"
+                                   {% if security_settings.require_strong_passwords %}checked{% endif %}>
+                            <label class="form-check-label" for="require_strong_passwords">
+                                Требовать сложные пароли
+                            </label>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="enable_2fa" name="enable_2fa"
+                                   {% if security_settings.enable_2fa %}checked{% endif %}>
+                            <label class="form-check-label" for="enable_2fa">
+                                Включить двухфакторную аутентификацию
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Сохранить настройки безопасности</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Настройки резервного копирования -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Настройки резервного копирования</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="settings_type" value="backup">
+
+                        <div class="mb-3">
+                            <label for="auto_backup_frequency" class="form-label">Частота автоматического копирования</label>
+                            <select class="form-select" id="auto_backup_frequency" name="auto_backup_frequency">
+                                <option value="disabled" {% if backup_settings.auto_backup_frequency =='disabled' %}selected{% endif %}>Отключено</option>
+                                <option value="daily" {% if backup_settings.auto_backup_frequency =='daily' %}selected{% endif %}>Ежедневно</option>
+                                <option value="weekly" {% if backup_settings.auto_backup_frequency =='weekly' %}selected{% endif %}>Еженедельно</option>
+                                <option value="monthly" {% if backup_settings.auto_backup_frequency =='monthly' %}selected{% endif %}>Ежемесячно</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="backup_retention_days" class="form-label">Срок хранения копий (дни)</label>
+                            <input type="number" class="form-control" id="backup_retention_days" name="backup_retention_days"
+                                   value="{{ backup_settings.backup_retention_days }}" min="1" max="365">
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="backup_include_media" name="backup_include_media"
+                                   {% if backup_settings.backup_include_media %}checked{% endif %}>
+                            <label class="form-check-label" for="backup_include_media">
+                                Включать медиафайлы в автоматическое копирование
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning">Сохранить настройки копирования</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- Настройки уведомлений -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Настройки уведомлений</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="settings_type" value="notifications">
+
+                        <div class="mb-3">
+                            <h6>Email уведомления</h6>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="email_backup_notifications" name="email_backup_notifications"
+                                       {% if notification_settings.email_backup_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="email_backup_notifications">
+                                    Уведомления о резервном копировании
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="email_security_alerts" name="email_security_alerts"
+                                       {% if notification_settings.email_security_alerts %}checked{% endif %}>
+                                <label class="form-check-label" for="email_security_alerts">
+                                    Уведомления о безопасности
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="email_system_errors" name="email_system_errors"
+                                       {% if notification_settings.email_system_errors %}checked{% endif %}>
+                                <label class="form-check-label" for="email_system_errors">
+                                    Уведомления об ошибках системы
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notification_email" class="form-label">Email для уведомлений</label>
+                            <input type="email" class="form-control" id="notification_email" name="notification_email"
+                                   value="{{ notification_settings.notification_email }}">
+                        </div>
+
+                        <button type="submit" class="btn btn-success">Сохранить настройки уведомлений</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Системная информация -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Системная информация</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <strong>Версия Django:</strong><br>
+                            <strong>Версия Python:</strong><br>
+                            <strong>База данных:</strong><br>
+                            <strong>Сервер:</strong><br>
+                            <strong>Время запуска:</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            {{ system_info.django_version }}<br>
+                            {{ system_info.python_version }}<br>
+                            {{ system_info.database }}<br>
+                            {{ system_info.server }}<br>
+                            {{ system_info.start_time|date:"d.m.Y H:i" }}
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'audit:system_health' %}" class="btn btn-outline-info">
+                            <i class="fas fa-heartbeat"></i> Проверить состояние системы
+                        </a>
+                        <a href="{% url 'audit:clear_cache' %}" class="btn btn-outline-warning"
+                           onclick="return confirm('Очистить кеш системы?')">
+                            <i class="fas fa-broom"></i> Очистить кеш
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

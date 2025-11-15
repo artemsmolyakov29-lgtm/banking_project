@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Одобрение кредита{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Одобрение кредитной заявки</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        Вы собираетесь одобрить кредитную заявку.
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>Информация о заявке:</h6>
+                            <p><strong>Клиент:</strong> {{ credit.client.get_full_name }}</p>
+                            <p><strong>Сумма:</strong> {{ credit.amount }} RUB</p>
+                            <p><strong>Срок:</strong> {{ credit.term }} месяцев</p>
+                            <p><strong>Ставка:</strong> {{ credit.interest_rate }}%</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Одобренная сумма</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="approved_amount" value="{{ credit.amount }}" required min="1000" step="1000">
+                                <span class="input-group-text">RUB</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Одобренная ставка</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="approved_interest_rate" value="{{ credit.interest_rate }}" required min="1" max="50" step="0.1">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3" placeholder="Дополнительная информация по одобрению"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-success">Одобрить кредит</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

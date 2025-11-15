@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Пополнение счета{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Пополнение счета</h5>
+                </div>
+                <div class="card-body">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <p><strong>Счет:</strong> {{ account.account_number }}</p>
+                            <p><strong>Клиент:</strong> {{ account.client.get_full_name }}</p>
+                            <p><strong>Текущий баланс:</strong> {{ account.balance }} {{ account.currency }}</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Сумма пополнения</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="amount" required min="0.01" step="0.01">
+                                <span class="input-group-text">{{ account.currency }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Метод пополнения</label>
+                            <select class="form-select" name="deposit_method" required>
+                                <option value="">Выберите метод</option>
+                                <option value="CASH">Наличные</option>
+                                <option value="BANK_TRANSFER">Банковский перевод</option>
+                                <option value="CARD">Банковская карта</option>
+                                <option value="ELECTRONIC">Электронные деньги</option>
+                                <option value="OTHER">Другой метод</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Описание операции</label>
+                            <textarea class="form-control" name="description" rows="3" placeholder="Назначение платежа" required></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Дата операции</label>
+                            <input type="datetime-local" class="form-control" name="operation_date" required>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'accounts:account_detail' account.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-success">Пополнить счет</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

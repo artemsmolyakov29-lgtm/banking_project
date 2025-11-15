@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Снятие средств{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Снятие средств со счета</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        Обратите внимание: при снятии средств может взиматься комиссия.
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <p><strong>Счет:</strong> {{ account.account_number }}</p>
+                            <p><strong>Клиент:</strong> {{ account.client.get_full_name }}</p>
+                            <p><strong>Доступный баланс:</strong> {{ account.balance }} {{ account.currency }}</p>
+                            <p><strong>Лимит овердрафта:</strong> {{ account.overdraft_limit }} {{ account.currency }}</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Сумма снятия</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="amount" required min="0.01" step="0.01" max="{{ max_withdrawal }}">
+                                <span class="input-group-text">{{ account.currency }}</span>
+                            </div>
+                            <div class="form-text">Максимальная сумма для снятия: {{ max_withdrawal }} {{ account.currency }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Метод снятия</label>
+                            <select class="form-select" name="withdrawal_method" required>
+                                <option value="">Выберите метод</option>
+                                <option value="CASH">Наличные в кассе</option>
+                                <option value="ATM">Банкомат</option>
+                                <option value="TRANSFER">Перевод на другой счет</option>
+                                <option value="OTHER">Другой метод</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина снятия</label>
+                            <textarea class="form-control" name="reason" rows="3" placeholder="Укажите причину снятия средств" required></textarea>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>Комиссия:</strong> <span id="withdrawalFee">0.00 {{ account.currency }}</span><br>
+                            <strong>Итоговая сумма:</strong> <span id="withdrawalTotal">0.00 {{ account.currency }}</span>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'accounts:account_detail' account.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-danger">Снять средства</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const amountInput = document.querySelector('input[name="amount"]');
+    const feeDisplay = document.getElementById('withdrawalFee');
+    const totalDisplay = document.getElementById('withdrawalTotal');
+
+    function calculateWithdrawal() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const fee = Math.max(amount * 0.02, 50); // 2% но не менее 50 руб
+        const total = amount + fee;
+
+        feeDisplay.textContent = fee.toFixed(2) + ' {{ account.currency }}';
+        totalDisplay.textContent = total.toFixed(2) + ' {{ account.currency }}';
+    }
+
+    amountInput.addEventListener('input', calculateWithdrawal);
+});
+</script>
+{% endblock %}

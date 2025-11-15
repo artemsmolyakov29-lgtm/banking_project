@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Удаление клиента{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Подтверждение удаления клиента</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h6 class="alert-heading">Внимание! Это действие нельзя отменить.</h6>
+                        <p class="mb-0">Вы собираетесь удалить клиента и все связанные данные.</p>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>Информация о клиенте:</h6>
+                            <p><strong>ФИО:</strong> {{ client.get_full_name }}</p>
+                            <p><strong>Email:</strong> {{ client.email }}</p>
+                            <p><strong>Телефон:</strong> {{ client.phone_number }}</p>
+                            <p><strong>Дата регистрации:</strong> {{ client.created_at|date:"d.m.Y" }}</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина удаления</label>
+                            <select class="form-select" name="delete_reason" required>
+                                <option value="">Выберите причину</option>
+                                <option value="CLIENT_REQUEST">По запросу клиента</option>
+                                <option value="DUPLICATE">Дубликат записи</option>
+                                <option value="FRAUD">Мошенничество</option>
+                                <option value="OTHER">Другая причина</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3" required placeholder="Обязательно укажите причину удаления"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'clients:client_detail' client.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-danger">
+                                Удалить клиента
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

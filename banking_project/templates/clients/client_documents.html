@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}Документы клиента{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_detail' client.id %}">{{ client.get_full_name }}</a></li>
+            <li class="breadcrumb-item active">Документы</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Документы клиента</h5>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        Загрузить документ
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Название</th>
+                                    <th>Тип</th>
+                                    <th>Дата загрузки</th>
+                                    <th>Размер</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for document in documents %}
+                                <tr>
+                                    <td>{{ document.name }}</td>
+                                    <td>{{ document.get_document_type_display }}</td>
+                                    <td>{{ document.uploaded_at|date:"d.m.Y" }}</td>
+                                    <td>{{ document.file.size|filesizeformat }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ document.file.url }}" class="btn btn-outline-primary" target="_blank">
+                                                Просмотреть
+                                            </a>
+                                            <a href="{{ document.file.url }}" download class="btn btn-outline-success">
+                                                Скачать
+                                            </a>
+                                            <form method="post" action="{% url 'clients:document_delete' document.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Удалить документ?')">
+                                                    Удалить
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">Документы отсутствуют</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Обязательные документы</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-group">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Паспорт
+                                    {% if client.has_passport %}
+                                    <span class="badge bg-success">Есть</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Отсутствует</span>
+                                    {% endif %}
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    ИНН
+                                    {% if client.has_tax_id %}
+                                    <span class="badge bg-success">Есть</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Отсутствует</span>
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-group">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    СНИЛС
+                                    {% if client.has_snils %}
+                                    <span class="badge bg-success">Есть</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">Не обязательно</span>
+                                    {% endif %}
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Документы о доходе
+                                    {% if client.has_income_documents %}
+                                    <span class="badge bg-success">Есть</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">Не обязательно</span>
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Клиент:</strong><br>{{ client.get_full_name }}</p>
+                    <p><strong>Всего документов:</strong> {{ documents.count }}</p>
+                    <p><strong>Последнее обновление:</strong><br>{{ client.documents.last.uploaded_at|date:"d.m.Y" }}</p>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'clients:client_detail' client.id %}" class="btn btn-outline-primary">
+                            Назад к клиенту
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для загрузки документа -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Загрузить документ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Название документа</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Тип документа</label>
+                        <select class="form-select" name="document_type" required>
+                            <option value="PASSPORT">Паспорт</option>
+                            <option value="INN">ИНН</option>
+                            <option value="SNILS">СНИЛС</option>
+                            <option value="INCOME">Справка о доходах</option>
+                            <option value="CONTRACT">Договор</option>
+                            <option value="OTHER">Другой документ</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Файл</label>
+                        <input type="file" class="form-control" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Загрузить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

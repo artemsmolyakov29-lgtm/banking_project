@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная панель{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Главная панель управления</h1>
+        <div class="text-end">
+            <p class="mb-0">Добро пожаловать, {{ user.get_full_name|default:user.username }}</p>
+            <small class="text-muted">{{ user.get_role_display }}</small>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_clients }}</h4>
+                            <p class="mb-0">Клиентов</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_accounts }}</h4>
+                            <p class="mb-0">Счетов</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-wallet fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_transactions }}</h4>
+                            <p class="mb-0">Транзакций</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exchange-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ stats.total_balance }}</h4>
+                            <p class="mb-0">Общий баланс</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Последние транзакции</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_transactions %}
+                    <div class="list-group list-group-flush">
+                        {% for transaction in recent_transactions %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ transaction.get_transaction_type_display }}</h6>
+                                <small class="text-muted">{{ transaction.description|truncatewords:3 }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="fw-bold {% if transaction.transaction_type == 'DEPOSIT' or transaction.transaction_type == 'INCOME' %}text-success{% else %}text-danger{% endif %}">
+                                    {% if transaction.transaction_type == 'DEPOSIT' or transaction.transaction_type == 'INCOME' %}+{% else %}-{% endif %}
+                                    {{ transaction.amount }} {{ transaction.currency }}
+                                </span>
+                                <br>
+                                <small class="text-muted">{{ transaction.created_at|date:"d.m.Y H:i" }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <a href="{% url 'transactions:transaction_list' %}" class="btn btn-outline-primary btn-sm mt-3">
+                        Все транзакции
+                    </a>
+                    {% else %}
+                    <p class="text-muted">Транзакции отсутствуют</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Быстрые действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{% url 'clients:client_create' %}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-user-plus"></i> Новый клиент
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'accounts:account_create' %}" class="btn btn-outline-success w-100 mb-2">
+                                <i class="fas fa-plus"></i> Новый счет
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'transactions:transaction_create' %}" class="btn btn-outline-info w-100 mb-2">
+                                <i class="fas fa-exchange-alt"></i> Новая транзакция
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'credits:credit_apply' %}" class="btn btn-outline-warning w-100 mb-2">
+                                <i class="fas fa-credit-card"></i> Оформить кредит
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'deposits:deposit_open' %}" class="btn btn-outline-secondary w-100 mb-2">
+                                <i class="fas fa-piggy-bank"></i> Открыть депозит
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'reports:report_dashboard' %}" class="btn btn-outline-dark w-100 mb-2">
+                                <i class="fas fa-chart-bar"></i> Отчеты
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Системные уведомления</h5>
+                </div>
+                <div class="card-body">
+                    {% if notifications %}
+                    <div class="list-group list-group-flush">
+                        {% for notification in notifications %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ notification.title }}</h6>
+                                <small class="text-muted">{{ notification.created_at|timesince }}</small>
+                            </div>
+                            <p class="mb-1">{{ notification.message }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Нет новых уведомлений</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

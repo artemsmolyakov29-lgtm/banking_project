@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block title %}Транзакции{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Управление транзакциями</h1>
+        <a href="{% url 'transactions:transaction_create' %}" class="btn btn-primary">
+            Новая транзакция
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Дата с</label>
+                    <input type="date" class="form-control" name="start_date" value="{{ request.GET.start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Дата по</label>
+                    <input type="date" class="form-control" name="end_date" value="{{ request.GET.end_date }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Тип</label>
+                    <select class="form-select" name="transaction_type">
+                        <option value="">Все типы</option>
+                        <option value="TRANSFER" {% if request.GET.transaction_type =='TRANSFER' %}selected{% endif %}>Перевод</option>
+                        <option value="PAYMENT" {% if request.GET.transaction_type =='PAYMENT' %}selected{% endif %}>Платеж</option>
+                        <option value="DEPOSIT" {% if request.GET.transaction_type =='DEPOSIT' %}selected{% endif %}>Пополнение</option>
+                        <option value="WITHDRAWAL" {% if request.GET.transaction_type =='WITHDRAWAL' %}selected{% endif %}>Снятие</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Статус</label>
+                    <select class="form-select" name="status">
+                        <option value="">Все статусы</option>
+                        <option value="COMPLETED" {% if request.GET.status =='COMPLETED' %}selected{% endif %}>Завершена</option>
+                        <option value="PENDING" {% if request.GET.status =='PENDING' %}selected{% endif %}>В обработке</option>
+                        <option value="FAILED" {% if request.GET.status =='FAILED' %}selected{% endif %}>Ошибка</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label d-block">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">Фильтровать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Список транзакций</h5>
+            <span class="badge bg-primary">Всего: {{ paginator.count }}</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Дата</th>
+                            <th>Тип</th>
+                            <th>Отправитель</th>
+                            <th>Получатель</th>
+                            <th>Сумма</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction.id }}</td>
+                            <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                {% if transaction.transaction_type == 'TRANSFER' %}
+                                <span class="badge bg-info">Перевод</span>
+                                {% elif transaction.transaction_type == 'PAYMENT' %}
+                                <span class="badge bg-warning">Платеж</span>
+                                {% elif transaction.transaction_type == 'DEPOSIT' %}
+                                <span class="badge bg-success">Пополнение</span>
+                                {% else %}
+                                <span class="badge bg-danger">Снятие</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaction.from_account %}
+                                {{ transaction.from_account.account_number }}
+                                {% else %}
+                                <em>Внешний</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaction.to_account %}
+                                {{ transaction.to_account.account_number }}
+                                {% else %}
+                                <em>Внешний</em>
+                                {% endif %}
+                            </td>
+                            <td>{{ transaction.amount }} {{ transaction.currency }}</td>
+                            <td>
+                                {% if transaction.status == 'COMPLETED' %}
+                                <span class="badge bg-success">Завершена</span>
+                                {% elif transaction.status == 'PENDING' %}
+                                <span class="badge bg-warning">В обработке</span>
+                                {% elif transaction.status == 'FAILED' %}
+                                <span class="badge bg-danger">Ошибка</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transaction.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'transactions:transaction_detail' transaction.id %}" class="btn btn-sm btn-outline-primary">
+                                    Просмотр
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                Транзакции не найдены
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Назад</a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Вперед</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

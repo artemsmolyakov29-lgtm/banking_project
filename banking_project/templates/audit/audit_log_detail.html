@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Детали записи аудита #{{ audit_log.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'audit:log' %}">Журнал аудита</a></li>
+                    <li class="breadcrumb-item active">Запись #{{ audit_log.id }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Детальная информация о записи аудита</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">ID записи:</div>
+                        <div class="col-md-8">{{ audit_log.id }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Дата и время:</div>
+                        <div class="col-md-8">{{ audit_log.timestamp|date:"d.m.Y H:i:s" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Пользователь:</div>
+                        <div class="col-md-8">
+                            {% if audit_log.user %}
+                            {{ audit_log.user.get_full_name|default:audit_log.user.username }} ({{ audit_log.user.email }})
+                            {% else %}
+                            <em>Система</em>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Тип действия:</div>
+                        <div class="col-md-8">
+                            <span class="badge {% if audit_log.action_type == 'CREATE' %}bg-success{% elif audit_log.action_type == 'UPDATE' %}bg-warning{% elif audit_log.action_type == 'DELETE' %}bg-danger{% else %}bg-info{% endif %}">
+                                {{ audit_log.get_action_type_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Объект:</div>
+                        <div class="col-md-8">{{ audit_log.object_type }} #{{ audit_log.object_id }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">IP-адрес:</div>
+                        <div class="col-md-8">{{ audit_log.ip_address|default:"Не указан" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">User Agent:</div>
+                        <div class="col-md-8">{{ audit_log.user_agent|default:"Не указан" }}</div>
+                    </div>
+
+                    {% if audit_log.old_values %}
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="fw-bold">Старые значения:</h6>
+                            <pre class="bg-light p-3 border rounded"><code>{{ audit_log.old_values_json }}</code></pre>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if audit_log.new_values %}
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="fw-bold">Новые значения:</h6>
+                            <pre class="bg-light p-3 border rounded"><code>{{ audit_log.new_values_json }}</code></pre>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-12">
+                            <a href="{% url 'audit:log' %}" class="btn btn-secondary">Вернуться к журналу</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Счет #{{ account.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'accounts:account_list' %}">Все счета</a></li>
+            <li class="breadcrumb-item active">Счет #{{ account.id }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Информация о счете</h5>
+                    <span class="badge bg-{% if account.is_active %}success{% else %}danger{% endif %}">
+                        {% if account.is_active %}Активен{% else %}Закрыт{% endif %}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Номер счета:</strong><br>{{ account.account_number }}</p>
+                            <p><strong>Клиент:</strong><br>
+                            <a href="{% url 'clients:client_detail' account.client.id %}">{{ account.client.get_full_name }}</a></p>
+                            <p><strong>Тип счета:</strong><br>{{ account.get_account_type_display }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Баланс:</strong><br>{{ account.balance }} {{ account.currency }}</p>
+                            <p><strong>Дата открытия:</strong><br>{{ account.created_at|date:"d.m.Y" }}</p>
+                            <p><strong>Статус:</strong><br>
+                                {% if account.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                                {% else %}
+                                <span class="badge bg-danger">Закрыт</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Последние операции</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_transactions %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Тип</th>
+                                    <th>Описание</th>
+                                    <th>Сумма</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in recent_transactions %}
+                                <tr>
+                                    <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ transaction.get_transaction_type_display }}</td>
+                                    <td>{{ transaction.description|truncatewords:5 }}</td>
+                                    <td>{{ transaction.amount }} {{ account.currency }}</td>
+                                    <td>
+                                        {% if transaction.status == 'COMPLETED' %}
+                                        <span class="badge bg-success">Завершена</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">{{ transaction.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <a href="{% url 'accounts:account_transactions' account.id %}" class="btn btn-outline-primary btn-sm mt-2">
+                        Все операции
+                    </a>
+                    {% else %}
+                    <p class="text-muted">Операции по счету отсутствуют</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if account.is_active %}
+                        <a href="{% url 'accounts:transfer_form' account.id %}" class="btn btn-primary">Перевод</a>
+                        <a href="{% url 'accounts:withdraw_form' account.id %}" class="btn btn-outline-danger">Снять средства</a>
+                        <a href="{% url 'accounts:deposit_form' account.id %}" class="btn btn-outline-success">Пополнить счет</a>
+                        <a href="{% url 'accounts:account_confirm_close' account.id %}" class="btn btn-outline-warning">Закрыть счет</a>
+                        {% endif %}
+                        <a href="{% url 'accounts:account_transactions' account.id %}" class="btn btn-outline-info">История операций</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Статистика</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Всего операций:</strong> {{ total_transactions }}</p>
+                    <p><strong>Последняя операция:</strong><br>{{ last_transaction_date|date:"d.m.Y H:i" }}</p>
+                    <p><strong>Средний остаток:</strong> {{ average_balance }} {{ account.currency }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

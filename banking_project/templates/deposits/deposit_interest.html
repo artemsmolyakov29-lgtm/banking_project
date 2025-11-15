@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Начисление процентов{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'deposits:deposit_list' %}">Все депозиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'deposits:deposit_detail' deposit.id %}">Депозит #{{ deposit.id }}</a></li>
+            <li class="breadcrumb-item active">Начисление процентов</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">История начисления процентов</h5>
+                </div>
+                <div class="card-body">
+                    {% if interest_accruals %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата начисления</th>
+                                    <th>Период</th>
+                                    <th>Сумма начисления</th>
+                                    <th>Баланс до начисления</th>
+                                    <th>Баланс после начисления</th>
+                                    <th>Тип операции</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for accrual in interest_accruals %}
+                                <tr>
+                                    <td>{{ accrual.accrual_date|date:"d.m.Y" }}</td>
+                                    <td>{{ accrual.period_start|date:"d.m.Y" }} - {{ accrual.period_end|date:"d.m.Y" }}</td>
+                                    <td>{{ accrual.amount }} {{ deposit.currency }}</td>
+                                    <td>{{ accrual.balance_before }} {{ deposit.currency }}</td>
+                                    <td>{{ accrual.balance_after }} {{ deposit.currency }}</td>
+                                    <td>{{ accrual.get_operation_type_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">Начисления процентов отсутствуют</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о депозите</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Клиент:</strong> {{ deposit.account.client.get_full_name }}</p>
+                    <p><strong>Процентная ставка:</strong> {{ deposit.interest_rate }}%</p>
+                    <p><strong>Капитализация:</strong>
+                        {% if deposit.capitalization %}
+                        <span class="badge bg-success">Да</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Нет</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Частота начисления:</strong> {{ deposit.get_interest_frequency_display }}</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Статистика процентов</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Всего начислено:</strong> {{ total_interest }} {{ deposit.currency }}</p>
+                    <p><strong>Количество начислений:</strong> {{ interest_accruals.count }}</p>
+                    <p><strong>Последнее начисление:</strong><br>{{ last_accrual.accrual_date|date:"d.m.Y" }}</p>
+                    <p><strong>Следующее начисление:</strong><br>{{ next_accrual_date|date:"d.m.Y" }}</p>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'deposits:deposit_detail' deposit.id %}" class="btn btn-outline-primary">
+                            Назад к депозиту
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

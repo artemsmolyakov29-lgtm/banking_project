@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block title %}Перевыпуск карты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Перевыпуск банковской карты</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Текущая карта:</strong> **** **** **** {{ card.last_four_digits }}</p>
+                    <p><strong>Держатель:</strong> {{ card.account.client.get_full_name }}</p>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина перевыпуска</label>
+                            {{ form.reissue_reason }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Адрес доставки</label>
+                            {{ form.delivery_address }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Тип новой карты</label>
+                            {{ form.card_type }}
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            {{ form.keep_limits }}
+                            <label class="form-check-label">Сохранить текущие лимиты</label>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            Текущая карта будет заблокирована после перевыпуска.
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'cards:card_detail' card.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-info">
+                                Перевыпустить карту
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

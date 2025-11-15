@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Депозит #{{ deposit.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'deposits:deposit_list' %}">Все депозиты</a></li>
+            <li class="breadcrumb-item active">Депозит #{{ deposit.id }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о депозите</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Клиент:</strong><br>
+                            <a href="{% url 'clients:client_detail' deposit.account.client.id %}">{{ deposit.account.client.get_full_name }}</a></p>
+                            <p><strong>Номер счета:</strong><br>{{ deposit.account.account_number }}</p>
+                            <p><strong>Тип депозита:</strong><br>{{ deposit.get_deposit_type_display }}</p>
+                            <p><strong>Валюта:</strong><br>{{ deposit.currency }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Статус:</strong><br>
+                                {% if deposit.status == 'ACTIVE' %}
+                                <span class="badge bg-success">Активен</span>
+                                {% elif deposit.status == 'CLOSED' %}
+                                <span class="badge bg-secondary">Закрыт</span>
+                                {% else %}
+                                <span class="badge bg-warning">{{ deposit.get_status_display }}</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Дата открытия:</strong><br>{{ deposit.start_date|date:"d.m.Y" }}</p>
+                            <p><strong>Дата окончания:</strong><br>{{ deposit.end_date|date:"d.m.Y" }}</p>
+                            <p><strong>Процентная ставка:</strong><br>{{ deposit.interest_rate }}%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Финансовая информация</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Начальная сумма:</strong><br>{{ deposit.initial_amount }} {{ deposit.currency }}</p>
+                            <p><strong>Текущий баланс:</strong><br>{{ deposit.current_balance }} {{ deposit.currency }}</p>
+                            <p><strong>Накопленные проценты:</strong><br>{{ deposit.accrued_interest }} {{ deposit.currency }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Дополнительно</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Капитализация:</strong><br>
+                                {% if deposit.capitalization %}
+                                <span class="badge bg-success">Да</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Нет</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Пополнение:</strong><br>
+                                {% if deposit.replenishment %}
+                                <span class="badge bg-success">Разрешено</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Запрещено</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Снятие:</strong><br>
+                                {% if deposit.withdrawal %}
+                                <span class="badge bg-success">Разрешено</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Запрещено</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if deposit.status == 'ACTIVE' %}
+                        <a href="{% url 'deposits:deposit_confirm_close' deposit.id %}" class="btn btn-warning">Закрыть депозит</a>
+                        <a href="{% url 'deposits:deposit_early_close' deposit.id %}" class="btn btn-outline-danger">Досрочное закрытие</a>
+                        {% endif %}
+
+                        <a href="{% url 'deposits:deposit_interest' deposit.id %}" class="btn btn-outline-primary">Начисление процентов</a>
+
+                        {% if deposit.replenishment %}
+                        <button class="btn btn-outline-success">Пополнить депозит</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Статистика</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Осталось дней:</strong> {{ deposit.days_remaining }}</p>
+                    <p><strong>Общий доход:</strong> {{ deposit.total_income }} {{ deposit.currency }}</p>
+                    <p><strong>Эффективная ставка:</strong> {{ deposit.effective_rate }}%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

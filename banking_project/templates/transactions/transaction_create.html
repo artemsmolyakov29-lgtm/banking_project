@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}Создание транзакции{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Создание новой транзакции</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Тип транзакции</label>
+                                    <select class="form-select" name="transaction_type" required>
+                                        <option value="">Выберите тип</option>
+                                        <option value="TRANSFER">Перевод между счетами</option>
+                                        <option value="PAYMENT">Платеж</option>
+                                        <option value="DEPOSIT">Пополнение</option>
+                                        <option value="WITHDRAWAL">Снятие</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Счет отправителя</label>
+                                    <select class="form-select" name="from_account">
+                                        <option value="">Выберите счет</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}">{{ account.account_number }} ({{ account.balance }} {{ account.currency }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Сумма</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="amount" required min="0.01" step="0.01">
+                                        <span class="input-group-text">RUB</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Счет получателя</label>
+                                    <select class="form-select" name="to_account">
+                                        <option value="">Выберите счет</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}">{{ account.account_number }} ({{ account.client.get_full_name }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Валюта</label>
+                                    <select class="form-select" name="currency" required>
+                                        <option value="RUB">RUB - Российский рубль</option>
+                                        <option value="USD">USD - Доллар США</option>
+                                        <option value="EUR">EUR - Евро</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Дата выполнения</label>
+                                    <input type="datetime-local" class="form-control" name="execution_date" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Описание транзакции</label>
+                            <textarea class="form-control" name="description" rows="3" placeholder="Назначение платежа или описание операции" required></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Категория</label>
+                            <select class="form-select" name="category">
+                                <option value="SALARY">Зарплата</option>
+                                <option value="TRANSFER">Перевод</option>
+                                <option value="PAYMENT">Оплата услуг</option>
+                                <option value="REFUND">Возврат</option>
+                                <option value="OTHER">Другое</option>
+                            </select>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>Комиссия:</strong> <span id="feeAmount">0.00 RUB</span>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'transactions:transaction_list' %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">Создать транзакцию</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const amountInput = document.querySelector('input[name="amount"]');
+    const feeDisplay = document.getElementById('feeAmount');
+
+    function calculateFee() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const fee = amount * 0.015; // 1.5% комиссия
+        feeDisplay.textContent = fee.toFixed(2) + ' RUB';
+    }
+
+    amountInput.addEventListener('input', calculateFee);
+    calculateFee();
+});
+</script>
+{% endblock %}

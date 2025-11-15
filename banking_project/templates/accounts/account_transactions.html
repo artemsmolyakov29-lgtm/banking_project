@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Операции по счету{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'accounts:account_list' %}">Все счета</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'accounts:account_detail' account.id %}">Счет #{{ account.id }}</a></li>
+            <li class="breadcrumb-item active">Операции</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">История операций</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Тип операции</th>
+                                    <th>Описание</th>
+                                    <th>Сумма</th>
+                                    <th>Баланс после</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions %}
+                                <tr>
+                                    <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ transaction.get_transaction_type_display }}</td>
+                                    <td>{{ transaction.description }}</td>
+                                    <td class="{% if transaction.transaction_type == 'DEPOSIT' or transaction.transaction_type == 'INCOME' %}text-success{% else %}text-danger{% endif %}">
+                                        {% if transaction.transaction_type == 'DEPOSIT' or transaction.transaction_type == 'INCOME' %}+{% else %}-{% endif %}
+                                        {{ transaction.amount }} {{ account.currency }}
+                                    </td>
+                                    <td>{{ transaction.balance_after }} {{ account.currency }}</td>
+                                    <td>
+                                        {% if transaction.status == 'COMPLETED' %}
+                                        <span class="badge bg-success">Завершена</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">{{ transaction.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">Операции не найдены</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о счете</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Номер счета:</strong> {{ account.account_number }}</p>
+                    <p><strong>Клиент:</strong> {{ account.client.get_full_name }}</p>
+                    <p><strong>Текущий баланс:</strong> {{ account.balance }} {{ account.currency }}</p>
+                    <p><strong>Всего операций:</strong> {{ transactions.count }}</p>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'accounts:account_detail' account.id %}" class="btn btn-outline-primary">
+                            Назад к счету
+                        </a>
+                        <a href="{% url 'accounts:transfer_form' account.id %}" class="btn btn-primary">
+                            Сделать перевод
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

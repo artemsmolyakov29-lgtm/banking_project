@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Досрочное закрытие депозита{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Досрочное закрытие депозита</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h6 class="alert-heading">Внимание! Досрочное закрытие депозита</h6>
+                        <p class="mb-0">При досрочном закрытии депозита могут применяться штрафные санкции и пересчет процентов.</p>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>Информация о депозите:</h6>
+                            <p><strong>Клиент:</strong> {{ deposit.account.client.get_full_name }}</p>
+                            <p><strong>Номер счета:</strong> {{ deposit.account.account_number }}</p>
+                            <p><strong>Текущий баланс:</strong> {{ deposit.current_balance }} {{ deposit.currency }}</p>
+                            <p><strong>Накопленные проценты:</strong> {{ deposit.accrued_interest }} {{ deposit.currency }}</p>
+                            <p><strong>Дата открытия:</strong> {{ deposit.start_date|date:"d.m.Y" }}</p>
+                            <p><strong>Планируемая дата закрытия:</strong> {{ deposit.end_date|date:"d.m.Y" }}</p>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина досрочного закрытия</label>
+                            <select class="form-select" name="early_close_reason" required>
+                                <option value="">Выберите причину</option>
+                                <option value="FINANCIAL_NEED">Финансовая необходимость</option>
+                                <option value="RELOCATION">Переезд</option>
+                                <option value="BETTER_OFFER">Нашел更好的 предложение</option>
+                                <option value="OTHER">Другая причина</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3" required placeholder="Обязательно укажите причину досрочного закрытия"></textarea>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Финансовые последствия</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Штраф за досрочное закрытие:</strong> {{ penalty_amount }} {{ deposit.currency }}</p>
+                                <p><strong>Проценты к выплате:</strong> {{ reduced_interest }} {{ deposit.currency }}</p>
+                                <p><strong>Итоговая сумма к выплате:</strong> {{ final_amount }} {{ deposit.currency }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="confirm_understanding" id="confirm_understanding" required>
+                            <label class="form-check-label" for="confirm_understanding">
+                                Я понимаю финансовые последствия досрочного закрытия депозита
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'deposits:deposit_detail' deposit.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-danger">Подтвердить досрочное закрытие</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

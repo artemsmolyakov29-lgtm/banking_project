@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Контакты клиента{% endblock %}
+
+{% content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_detail' client.id %}">{{ client.get_full_name }}</a></li>
+            <li class="breadcrumb-item active">Контакты</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Контактная информация</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Основные контакты</h6>
+                            <p><strong>Email:</strong><br>{{ client.email }}</p>
+                            <p><strong>Телефон:</strong><br>{{ client.phone_number }}</p>
+                            <p><strong>Адрес регистрации:</strong><br>{{ client.address }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Дополнительная информация</h6>
+                            <p><strong>Фактический адрес:</strong><br>{{ client.actual_address|default:"Не указан" }}</p>
+                            <p><strong>Рабочий телефон:</strong><br>{{ client.work_phone|default:"Не указан" }}</p>
+                            <p><strong>Дополнительный email:</strong><br>{{ client.secondary_email|default:"Не указан" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">История контактов</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Тип контакта</th>
+                                    <th>Тема</th>
+                                    <th>Результат</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contact in contact_history %}
+                                <tr>
+                                    <td>{{ contact.contact_date|date:"d.m.Y" }}</td>
+                                    <td>{{ contact.get_contact_type_display }}</td>
+                                    <td>{{ contact.topic }}</td>
+                                    <td>{{ contact.result|truncatewords:5 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-4">История контактов отсутствует</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'clients:client_detail' client.id %}" class="btn btn-outline-primary">
+                            Назад к клиенту
+                        </a>
+                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#contactModal">
+                            Добавить контакт
+                        </button>
+                        <a href="tel:{{ client.phone_number }}" class="btn btn-outline-info">
+                            Позвонить
+                        </a>
+                        <a href="mailto:{{ client.email }}" class="btn btn-outline-warning">
+                            Написать email
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для добавления контакта -->
+<div class="modal fade" id="contactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить контакт</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Тип контакта</label>
+                        <select class="form-select" name="contact_type" required>
+                            <option value="PHONE">Телефонный звонок</option>
+                            <option value="EMAIL">Email</option>
+                            <option value="MEETING">Встреча</option>
+                            <option value="OTHER">Другое</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Тема</label>
+                        <input type="text" class="form-control" name="topic" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Результат</label>
+                        <textarea class="form-control" name="result" rows="3" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

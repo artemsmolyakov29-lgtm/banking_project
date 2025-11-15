@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}Финансовый отчет{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Финансовый отчет</h1>
+        <div>
+            <a href="?export=pdf" class="btn btn-danger me-2">PDF</a>
+            <a href="?export=excel" class="btn btn-success">Excel</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Параметры отчета</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Период с</label>
+                    <input type="date" class="form-control" name="start_date" value="{{ request.GET.start_date }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Период по</label>
+                    <input type="date" class="form-control" name="end_date" value="{{ request.GET.end_date }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Тип отчета</label>
+                    <select class="form-select" name="report_type">
+                        <option value="daily" {% if request.GET.report_type =='daily' %}selected{% endif %}>Ежедневный</option>
+                        <option value="monthly" {% if request.GET.report_type =='monthly' %}selected{% endif %}>Ежемесячный</option>
+                        <option value="quarterly" {% if request.GET.report_type =='quarterly' %}selected{% endif %}>Квартальный</option>
+                        <option value="yearly" {% if request.GET.report_type =='yearly' %}selected{% endif %}>Годовой</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Сформировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_income }} RUB</h4>
+                    <small>Общий доход</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_expenses }} RUB</h4>
+                    <small>Общие расходы</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ net_profit }} RUB</h4>
+                    <small>Чистая прибыль</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Доходы по категориям</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th>Сумма</th>
+                                    <th>Доля</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for income in income_by_category %}
+                                <tr>
+                                    <td>{{ income.category }}</td>
+                                    <td>{{ income.amount }} RUB</td>
+                                    <td>{{ income.percentage }}%</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-4">Данные отсутствуют</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Расходы по категориям</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th>Сумма</th>
+                                    <th>Доля</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for expense in expenses_by_category %}
+                                <tr>
+                                    <td>{{ expense.category }}</td>
+                                    <td>{{ expense.amount }} RUB</td>
+                                    <td>{{ expense.percentage }}%</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-4">Данные отсутствуют</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Детализация операций</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Тип операции</th>
+                            <th>Описание</th>
+                            <th>Сумма</th>
+                            <th>Категория</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction.date|date:"d.m.Y" }}</td>
+                            <td>
+                                {% if transaction.type == 'income' %}
+                                <span class="badge bg-success">Доход</span>
+                                {% else %}
+                                <span class="badge bg-danger">Расход</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ transaction.description }}</td>
+                            <td>{{ transaction.amount }} RUB</td>
+                            <td>{{ transaction.category }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4">Операции не найдены</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

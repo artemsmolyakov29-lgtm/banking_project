@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Карта #{{ card.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'cards:card_list' %}">Все карты</a></li>
+            <li class="breadcrumb-item active">Карта #{{ card.id }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о карте</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Номер карты:</strong><br>**** **** **** {{ card.last_four_digits }}</p>
+                            <p><strong>Держатель:</strong><br>{{ card.account.client.get_full_name }}</p>
+                            <p><strong>Счет:</strong><br>{{ card.account.account_number }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Тип карты:</strong><br>{{ card.get_card_type_display }}</p>
+                            <p><strong>Дата выпуска:</strong><br>{{ card.issue_date|date:"d.m.Y" }}</p>
+                            <p><strong>Срок действия:</strong><br>{{ card.expiry_date|date:"m/Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Лимиты карты</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4 mb-3">
+                            <div class="border rounded p-3">
+                                <h6>Дневной лимит</h6>
+                                <h4 class="text-primary">{{ card.daily_limit }} {{ card.currency }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="border rounded p-3">
+                                <h6>Месячный лимит</h6>
+                                <h4 class="text-primary">{{ card.monthly_limit }} {{ card.currency }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="border rounded p-3">
+                                <h6>Лимит операции</h6>
+                                <h4 class="text-primary">{{ card.transaction_limit }} {{ card.currency }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if card.status == 'ACTIVE' %}
+                        <a href="{% url 'cards:card_confirm_block' card.id %}" class="btn btn-warning">
+                            Заблокировать карту
+                        </a>
+                        {% elif card.status == 'BLOCKED' %}
+                        <a href="{% url 'cards:card_confirm_unblock' card.id %}" class="btn btn-success">
+                            Разблокировать карту
+                        </a>
+                        {% endif %}
+
+                        <a href="{% url 'cards:card_limits' card.id %}" class="btn btn-outline-primary">
+                            Изменить лимиты
+                        </a>
+                        <a href="{% url 'cards:card_reissue' card.id %}" class="btn btn-outline-info">
+                            Перевыпустить карту
+                        </a>
+                        <a href="{% url 'cards:card_transactions' card.id %}" class="btn btn-outline-dark">
+                            История операций
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

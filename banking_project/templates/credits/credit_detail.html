@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Кредит #{{ credit.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item active">Кредит #{{ credit.id }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о кредите</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Клиент:</strong><br>
+                            <a href="{% url 'clients:client_detail' credit.client.id %}">{{ credit.client.get_full_name }}</a></p>
+                            <p><strong>Тип кредита:</strong><br>{{ credit.get_credit_type_display }}</p>
+                            <p><strong>Сумма кредита:</strong><br>{{ credit.amount }} RUB</p>
+                            <p><strong>Остаток долга:</strong><br>{{ credit.remaining_amount }} RUB</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Статус:</strong><br>
+                                {% if credit.status == 'PENDING' %}
+                                <span class="badge bg-warning">На рассмотрении</span>
+                                {% elif credit.status == 'APPROVED' %}
+                                <span class="badge bg-success">Одобрен</span>
+                                {% elif credit.status == 'ACTIVE' %}
+                                <span class="badge bg-primary">Активен</span>
+                                {% elif credit.status == 'CLOSED' %}
+                                <span class="badge bg-secondary">Закрыт</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ credit.get_status_display }}</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Процентная ставка:</strong><br>{{ credit.interest_rate }}%</p>
+                            <p><strong>Срок кредита:</strong><br>{{ credit.term }} месяцев</p>
+                            <p><strong>Дата выдачи:</strong><br>{{ credit.start_date|date:"d.m.Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Ближайший платеж</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if next_payment %}
+                            <p><strong>Дата:</strong> {{ next_payment.due_date|date:"d.m.Y" }}</p>
+                            <p><strong>Сумма:</strong> {{ next_payment.amount }} RUB</p>
+                            <a href="{% url 'credits:credit_payments' credit.id %}" class="btn btn-sm btn-outline-primary">
+                                Все платежи
+                            </a>
+                            {% else %}
+                            <p class="text-muted">Платежи отсутствуют</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Статистика</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Выплачено:</strong> {{ credit.paid_amount }} RUB</p>
+                            <p><strong>Просрочка:</strong> {{ credit.overdue_amount }} RUB</p>
+                            <p><strong>Осталось выплат:</strong> {{ credit.remaining_payments }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if credit.status == 'PENDING' %}
+                        <a href="{% url 'credits:credit_approve' credit.id %}" class="btn btn-success">Одобрить</a>
+                        <a href="{% url 'credits:credit_reject' credit.id %}" class="btn btn-danger">Отклонить</a>
+                        {% endif %}
+
+                        {% if credit.status == 'ACTIVE' %}
+                        <a href="{% url 'credits:credit_payment_form' credit.id %}" class="btn btn-primary">Внести платеж</a>
+                        {% endif %}
+
+                        <a href="{% url 'credits:credit_payments' credit.id %}" class="btn btn-outline-primary">Платежи</a>
+                        <a href="{% url 'credits:credit_schedule' credit.id %}" class="btn btn-outline-info">График платежей</a>
+                        <a href="{% url 'credits:credit_collaterals' credit.id %}" class="btn btn-outline-warning">Залоги</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

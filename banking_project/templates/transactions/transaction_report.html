@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block title %}Отчет по транзакциям{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Отчет по транзакциям</h1>
+        <div>
+            <a href="?export=pdf" class="btn btn-danger me-2">PDF</a>
+            <a href="?export=excel" class="btn btn-success">Excel</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Параметры отчета</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Период с</label>
+                    <input type="date" class="form-control" name="start_date" value="{{ request.GET.start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Период по</label>
+                    <input type="date" class="form-control" name="end_date" value="{{ request.GET.end_date }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Группировка</label>
+                    <select class="form-select" name="group_by">
+                        <option value="day" {% if request.GET.group_by =='day' %}selected{% endif %}>По дням</option>
+                        <option value="week" {% if request.GET.group_by =='week' %}selected{% endif %}>По неделям</option>
+                        <option value="month" {% if request.GET.group_by =='month' %}selected{% endif %}>По месяцам</option>
+                        <option value="category" {% if request.GET.group_by =='category' %}selected{% endif %}>По категориям</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Тип отчета</label>
+                    <select class="form-select" name="report_type">
+                        <option value="summary" {% if request.GET.report_type =='summary' %}selected{% endif %}>Сводный</option>
+                        <option value="detailed" {% if request.GET.report_type =='detailed' %}selected{% endif %}>Детальный</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label d-block">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">Сформировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_transactions }}</h4>
+                    <small>Всего транзакций</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_income }} RUB</h4>
+                    <small>Общий доход</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_expenses }} RUB</h4>
+                    <small>Общий расход</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_fees }} RUB</h4>
+                    <small>Комиссии</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Статистика по типам операций</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Тип операции</th>
+                            <th>Количество</th>
+                            <th>Общая сумма</th>
+                            <th>Средняя сумма</th>
+                            <th>Комиссии</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in transaction_stats %}
+                        <tr>
+                            <td>{{ stat.transaction_type_display }}</td>
+                            <td>{{ stat.count }}</td>
+                            <td>{{ stat.total_amount }} RUB</td>
+                            <td>{{ stat.avg_amount }} RUB</td>
+                            <td>{{ stat.total_fees }} RUB</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4">Данные отсутствуют</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Детализация транзакций</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Тип</th>
+                            <th>Категория</th>
+                            <th>Отправитель</th>
+                            <th>Получатель</th>
+                            <th>Сумма</th>
+                            <th>Комиссия</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>{{ transaction.get_transaction_type_display }}</td>
+                            <td>{{ transaction.get_category_display }}</td>
+                            <td>
+                                {% if transaction.from_account %}
+                                {{ transaction.from_account.account_number }}
+                                {% else %}
+                                <em>Внешний</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaction.to_account %}
+                                {{ transaction.to_account.account_number }}
+                                {% else %}
+                                <em>Внешний</em>
+                                {% endif %}
+                            </td>
+                            <td>{{ transaction.amount }} {{ transaction.currency }}</td>
+                            <td>{{ transaction.fee }} {{ transaction.currency }}</td>
+                            <td>
+                                {% if transaction.status == 'COMPLETED' %}
+                                <span class="badge bg-success">Завершена</span>
+                                {% else %}
+                                <span class="badge bg-warning">{{ transaction.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">Транзакции не найдены</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

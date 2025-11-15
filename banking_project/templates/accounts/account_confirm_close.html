@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Закрытие счета{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">Подтверждение закрытия счета</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading">Внимание!</h6>
+                        <p class="mb-0">Вы собираетесь закрыть банковский счет. Эта операция не может быть отменена.</p>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6>Информация о счете:</h6>
+                            <p><strong>Номер счета:</strong> {{ account.account_number }}</p>
+                            <p><strong>Клиент:</strong> {{ account.client.get_full_name }}</p>
+                            <p><strong>Тип счета:</strong> {{ account.get_account_type_display }}</p>
+                            <p><strong>Текущий баланс:</strong> {{ account.balance }} {{ account.currency }}</p>
+                            <p><strong>Дата открытия:</strong> {{ account.created_at|date:"d.m.Y" }}</p>
+                        </div>
+                    </div>
+
+                    {% if account.balance > 0 %}
+                    <div class="alert alert-info">
+                        <strong>Остаток средств:</strong> {{ account.balance }} {{ account.currency }}<br>
+                        Средства будут автоматически переведены на основной счет клиента.
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Причина закрытия</label>
+                            <select class="form-select" name="close_reason" required>
+                                <option value="">Выберите причину</option>
+                                <option value="CLIENT_REQUEST">По запросу клиента</option>
+                                <option value="ACCOUNT_INACTIVE">Неактивный счет</option>
+                                <option value="DUPLICATE">Дубликат счета</option>
+                                <option value="OTHER">Другая причина</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Комментарий</label>
+                            <textarea class="form-control" name="comment" rows="3" placeholder="Дополнительная информация о закрытии счета"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'accounts:account_detail' account.id %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-warning">Закрыть счет</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

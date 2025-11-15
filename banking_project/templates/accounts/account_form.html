@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if account %}Редактирование счета{% else %}Создание счета{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        {% if account %}Редактирование счета{% else %}Открытие нового счета{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Клиент</label>
+                                    <select class="form-select" name="client" required>
+                                        <option value="">Выберите клиента</option>
+                                        {% for client in clients %}
+                                        <option value="{{ client.id }}" {% if account.client.id == client.id %}selected{% endif %}>
+                                            {{ client.get_full_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Тип счета</label>
+                                    <select class="form-select" name="account_type" required>
+                                        <option value="">Выберите тип</option>
+                                        <option value="CHECKING" {% if account.account_type =='CHECKING' %}selected{% endif %}>Расчетный</option>
+                                        <option value="SAVINGS" {% if account.account_type =='SAVINGS' %}selected{% endif %}>Сберегательный</option>
+                                        <option value="DEPOSIT" {% if account.account_type =='DEPOSIT' %}selected{% endif %}>Депозитный</option>
+                                        <option value="CREDIT" {% if account.account_type =='CREDIT' %}selected{% endif %}>Кредитный</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Валюта</label>
+                                    <select class="form-select" name="currency" required>
+                                        <option value="RUB" {% if account.currency =='RUB' %}selected{% endif %}>RUB - Российский рубль</option>
+                                        <option value="USD" {% if account.currency =='USD' %}selected{% endif %}>USD - Доллар США</option>
+                                        <option value="EUR" {% if account.currency =='EUR' %}selected{% endif %}>EUR - Евро</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Начальный баланс</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="balance" value="{{ account.balance|default:'0' }}" step="0.01" min="0">
+                                        <span class="input-group-text" id="currencySymbol">RUB</span>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Лимит овердрафта</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="overdraft_limit" value="{{ account.overdraft_limit|default:'0' }}" step="0.01" min="0">
+                                        <span class="input-group-text">RUB</span>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" name="is_active" id="is_active" {% if account.is_active or not account %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_active">Активный счет</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Описание</label>
+                            <textarea class="form-control" name="description" rows="3" placeholder="Дополнительная информация о счете">{{ account.description|default:'' }}</textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% if account %}{% url 'accounts:account_detail' account.id %}{% else %}{% url 'accounts:account_list' %}{% endif %}" class="btn btn-secondary">
+                                Отмена
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if account %}Сохранить изменения{% else %}Создать счет{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const currencySelect = document.querySelector('select[name="currency"]');
+    const currencySymbol = document.getElementById('currencySymbol');
+
+    currencySelect.addEventListener('change', function() {
+        const currency = this.value;
+        currencySymbol.textContent = currency;
+    });
+});
+</script>
+{% endblock %}

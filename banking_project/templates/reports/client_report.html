@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}Отчет по клиентам{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Отчет по клиентам</h1>
+        <div>
+            <a href="?export=pdf" class="btn btn-danger me-2">PDF</a>
+            <a href="?export=excel" class="btn btn-success">Excel</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Фильтры отчета</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Дата с</label>
+                    <input type="date" class="form-control" name="start_date" value="{{ request.GET.start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Дата по</label>
+                    <input type="date" class="form-control" name="end_date" value="{{ request.GET.end_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Статус клиента</label>
+                    <select class="form-select" name="status">
+                        <option value="">Все статусы</option>
+                        <option value="active" {% if request.GET.status =='active' %}selected{% endif %}>Активные</option>
+                        <option value="inactive" {% if request.GET.status =='inactive' %}selected{% endif %}>Неактивные</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label d-block">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">Сформировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_clients }}</h4>
+                    <small>Всего клиентов</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ active_clients }}</h4>
+                    <small>Активных клиентов</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ new_clients }}</h4>
+                    <small>Новых клиентов</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4>{{ avg_balance }}</h4>
+                    <small>Средний баланс (RUB)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Детальный отчет по клиентам</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ФИО</th>
+                            <th>Email</th>
+                            <th>Телефон</th>
+                            <th>Дата регистрации</th>
+                            <th>Статус</th>
+                            <th>Количество счетов</th>
+                            <th>Общий баланс</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for client in clients %}
+                        <tr>
+                            <td>{{ client.get_full_name }}</td>
+                            <td>{{ client.email }}</td>
+                            <td>{{ client.phone_number }}</td>
+                            <td>{{ client.created_at|date:"d.m.Y" }}</td>
+                            <td>
+                                {% if client.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                                {% else %}
+                                <span class="badge bg-danger">Неактивен</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ client.accounts_count }}</td>
+                            <td>{{ client.total_balance }} RUB</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">Клиенты не найдены</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
