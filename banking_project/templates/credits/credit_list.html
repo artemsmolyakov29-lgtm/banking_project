@@ -1,30 +1,60 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Кредиты{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active">Кредиты</li>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Управление кредитами</h1>
-        <a href="{% url 'credits:credit_apply' %}" class="btn btn-primary">
-            Оформить кредит
-        </a>
+        <h1 class="h3 mb-0">
+            <i class="fas fa-hand-holding-usd me-2"></i>Управление кредитами
+        </h1>
+        <div>
+            {% if user.role in 'employee,admin' %}
+            <a href="{% url 'credits:credit_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Оформить кредит
+            </a>
+            {% endif %}
+            <a href="{% url 'credits:credit_apply' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-file-alt me-1"></i>Подать заявку
+            </a>
+        </div>
     </div>
+
+    <!-- Сообщения -->
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="card">
         <div class="card-header">
-            <h5 class="mb-0">Список кредитов</h5>
+            <h5 class="mb-0">
+                <i class="fas fa-list me-2"></i>Список кредитов
+            </h5>
         </div>
         <div class="card-body">
+            {% if credits %}
             <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
                         <tr>
-                            <th>ID</th>
                             <th>Клиент</th>
+                            <th>Тип кредита</th>
                             <th>Сумма</th>
                             <th>Ставка</th>
                             <th>Срок</th>
+                            <th>Остаток</th>
                             <th>Статус</th>
                             <th>Действия</th>
                         </tr>
@@ -32,40 +62,148 @@
                     <tbody>
                         {% for credit in credits %}
                         <tr>
-                            <td>{{ credit.id }}</td>
-                            <td>{{ credit.client.get_full_name }}</td>
-                            <td>{{ credit.amount }} RUB</td>
-                            <td>{{ credit.interest_rate }}%</td>
-                            <td>{{ credit.term }} мес.</td>
                             <td>
-                                {% if credit.status == 'PENDING' %}
-                                <span class="badge bg-warning">На рассмотрении</span>
-                                {% elif credit.status == 'APPROVED' %}
-                                <span class="badge bg-success">Одобрен</span>
-                                {% elif credit.status == 'ACTIVE' %}
-                                <span class="badge bg-primary">Активен</span>
-                                {% elif credit.status == 'CLOSED' %}
-                                <span class="badge bg-secondary">Закрыт</span>
+                                <strong>{{ credit.client.full_name }}</strong>
+                                {% if user.role in 'employee,admin' %}
+                                <br><small class="text-muted">ID: {{ credit.client.id }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ credit.get_credit_type_display }}</td>
+                            <td>
+                                <strong>{{ credit.amount }} руб.</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ credit.interest_rate }}%</span>
+                            </td>
+                            <td>{{ credit.term_months }} мес.</td>
+                            <td>
+                                {% if credit.remaining_amount %}
+                                <span class="text-{% if credit.remaining_amount > 0 %}danger{% else %}success{% endif %}">
+                                    {{ credit.remaining_amount }} руб.
+                                </span>
                                 {% else %}
-                                <span class="badge bg-danger">{{ credit.get_status_display }}</span>
+                                <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-sm btn-outline-primary">
-                                    Просмотр
-                                </a>
+                                {% if credit.status == 'active' %}
+                                <span class="badge bg-success">Активен</span>
+                                {% elif credit.status == 'approved' %}
+                                <span class="badge bg-info">Одобрен</span>
+                                {% elif credit.status == 'pending' %}
+                                <span class="badge bg-warning">На рассмотрении</span>
+                                {% elif credit.status == 'rejected' %}
+                                <span class="badge bg-danger">Отклонен</span>
+                                {% elif credit.status == 'closed' %}
+                                <span class="badge bg-secondary">Закрыт</span>
+                                {% elif credit.status == 'overdue' %}
+                                <span class="badge bg-danger">Просрочен</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ credit.get_status_display }}</span>
+                                {% endif %}
                             </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center py-4">
-                                Кредиты не найдены
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-outline-primary" title="Просмотр">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if user.role in 'employee,admin' %}
+                                    <a href="{% url 'credits:credit_update' credit.id %}" class="btn btn-outline-secondary" title="Редактировать">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if credit.status == 'pending' and user.role in 'employee,admin' %}
+                                    <a href="{% url 'credits:credit_approve' credit.id %}" class="btn btn-outline-success" title="Одобрить">
+                                        <i class="fas fa-check"></i>
+                                    </a>
+                                    <a href="{% url 'credits:credit_reject' credit.id %}" class="btn btn-outline-danger" title="Отклонить">
+                                        <i class="fas fa-times"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if user.role == 'admin' %}
+                                    <button type="button" class="btn btn-outline-danger"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deleteModal{{ credit.id }}"
+                                            title="Удалить">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Модальное окно подтверждения удаления -->
+                                {% if user.role == 'admin' %}
+                                <div class="modal fade" id="deleteModal{{ credit.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Подтверждение удаления</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>Вы уверены, что хотите удалить кредит для <strong>{{ credit.client.full_name }}</strong>?</p>
+                                                <p class="text-danger">Это действие нельзя отменить.</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                <form method="post" action="{% url 'credits:credit_delete' credit.id %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-danger">Удалить</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+
+            <!-- Пагинация -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">&laquo; Первая</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперед</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Последняя &raquo;</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-hand-holding-usd fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Кредиты не найдены</h5>
+                <p class="text-muted">Здесь будут отображаться кредитные договоры</p>
+                {% if user.role in 'employee,admin' %}
+                <a href="{% url 'credits:credit_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Оформить первый кредит
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

@@ -1,99 +1,229 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}{% if client %}Редактирование клиента{% else %}Добавление клиента{% endif %}{% endblock %}
+{% block title %}{% if form.instance.pk %}Редактирование клиента{% else %}Добавление клиента{% endif %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Клиенты</a></li>
+<li class="breadcrumb-item active">
+    {% if form.instance.pk %}Редактирование {{ form.instance.full_name }}{% else %}Добавление клиента{% endif %}
+</li>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
-            <li class="breadcrumb-item active">
-                {% if client %}Редактирование {{ client.get_full_name }}{% else %}Добавление клиента{% endif %}
-            </li>
-        </ol>
-    </nav>
-
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-10">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        {% if client %}Редактирование клиента{% else %}Добавление нового клиента{% endif %}
+                        <i class="fas {% if form.instance.pk %}fa-edit{% else %}fa-plus{% endif %} me-2"></i>
+                        {% if form.instance.pk %}Редактирование клиента{% else %}Добавление нового клиента{% endif %}
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="post">
+                    <!-- Отображение ошибок формы -->
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <h6 class="alert-heading">Пожалуйста, исправьте следующие ошибки:</h6>
+                        <ul class="mb-0">
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
                         {% csrf_token %}
 
                         <div class="row">
+                            <!-- Личная информация -->
                             <div class="col-md-6">
-                                <h6>Личная информация</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Фамилия</label>
-                                    <input type="text" class="form-control" name="last_name" value="{{ form.last_name.value|default:'' }}" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Имя</label>
-                                    <input type="text" class="form-control" name="first_name" value="{{ form.first_name.value|default:'' }}" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Отчество</label>
-                                    <input type="text" class="form-control" name="middle_name" value="{{ form.middle_name.value|default:'' }}">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Дата рождения</label>
-                                    <input type="date" class="form-control" name="birth_date" value="{{ form.birth_date.value|default:'' }}" required>
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Личная информация</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label">
+                                                        Фамилия *
+                                                    </label>
+                                                    {{ form.last_name }}
+                                                    {% if form.last_name.help_text %}
+                                                    <div class="form-text">{{ form.last_name.help_text }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label">
+                                                        Имя *
+                                                    </label>
+                                                    {{ form.first_name }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label">
+                                                        Отчество
+                                                    </label>
+                                                    {{ form.middle_name }}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Дата рождения *
+                                            </label>
+                                            {{ form.birth_date }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                ИНН *
+                                            </label>
+                                            {{ form.inn }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
+                            <!-- Контактная информация -->
                             <div class="col-md-6">
-                                <h6>Контактная информация</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Email</label>
-                                    <input type="email" class="form-control" name="email" value="{{ form.email.value|default:'' }}" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Телефон</label>
-                                    <input type="tel" class="form-control" name="phone_number" value="{{ form.phone_number.value|default:'' }}" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Адрес регистрации</label>
-                                    <textarea class="form-control" name="address" rows="3" required>{{ form.address.value|default:'' }}</textarea>
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Контактная информация</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Email *
+                                            </label>
+                                            {{ form.email }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Телефон *
+                                            </label>
+                                            {{ form.phone_number }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Адрес регистрации *
+                                            </label>
+                                            {{ form.address }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Фактический адрес
+                                            </label>
+                                            {{ form.actual_address }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row mt-3">
+                        <div class="row">
+                            <!-- Документы -->
                             <div class="col-md-6">
-                                <h6>Документы</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Серия и номер паспорта</label>
-                                    <input type="text" class="form-control" name="passport_number" value="{{ form.passport_number.value|default:'' }}" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">ИНН</label>
-                                    <input type="text" class="form-control" name="tax_id" value="{{ form.tax_id.value|default:'' }}">
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Документы</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Серия и номер паспорта *
+                                            </label>
+                                            {{ form.passport_number }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Кем выдан паспорт
+                                            </label>
+                                            {{ form.passport_issued_by }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Дата выдачи паспорта
+                                            </label>
+                                            {{ form.passport_issue_date }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+
+                            <!-- Дополнительно -->
                             <div class="col-md-6">
-                                <h6>Дополнительно</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Фактический адрес</label>
-                                    <textarea class="form-control" name="actual_address" rows="3">{{ form.actual_address.value|default:'' }}</textarea>
-                                </div>
-                                <div class="mb-3 form-check">
-                                    <input type="checkbox" class="form-check-input" name="is_active" {% if form.is_active.value %}checked{% endif %}>
-                                    <label class="form-check-label">Активный клиент</label>
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Дополнительно</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                Кредитный рейтинг
+                                            </label>
+                                            {{ form.credit_rating }}
+                                            <div class="form-text">От 0 до 100 баллов</div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                {{ form.is_vip }}
+                                                <label class="form-check-label">
+                                                    VIP клиент
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                {{ form.is_active }}
+                                                <label class="form-check-label">
+                                                    Активный клиент
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {% if form.instance.pk %}
+                                        <div class="alert alert-info">
+                                            <small>
+                                                <strong>Создан:</strong> {{ form.instance.created_at|date:"d.m.Y H:i" }}<br>
+                                                {% if form.instance.updated_at %}
+                                                <strong>Обновлен:</strong> {{ form.instance.updated_at|date:"d.m.Y H:i" }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <a href="{% if client %}{% url 'clients:client_detail' client.id %}{% else %}{% url 'clients:client_list' %}{% endif %}" class="btn btn-secondary me-md-2">
-                                Отмена
+                            <a href="{% if form.instance.pk %}{% url 'clients:client_detail' form.instance.pk %}{% else %}{% url 'clients:client_list' %}{% endif %}"
+                               class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i>Отмена
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                {% if client %}Сохранить изменения{% else %}Добавить клиента{% endif %}
+                                <i class="fas {% if form.instance.pk %}fa-save{% else %}fa-plus{% endif %} me-1"></i>
+                                {% if form.instance.pk %}Сохранить изменения{% else %}Добавить клиента{% endif %}
                             </button>
                         </div>
                     </form>
@@ -102,4 +232,29 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Добавляем классы Bootstrap к элементам формы
+document.addEventListener('DOMContentLoaded', function() {
+    // Добавляем класс form-control ко всем input, select, textarea
+    const formElements = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), select, textarea');
+    formElements.forEach(element => {
+        element.classList.add('form-control');
+    });
+
+    // Добавляем класс form-check-input к чекбоксам и радио
+    const checkboxes = document.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.classList.add('form-check-input');
+    });
+
+    // Добавляем класс form-select к select элементам
+    const selectElements = document.querySelectorAll('select');
+    selectElements.forEach(select => {
+        select.classList.add('form-select');
+    });
+});
+</script>
 {% endblock %}

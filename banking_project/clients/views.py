@@ -3,6 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.apps import apps
+from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
+from django.http import HttpResponseForbidden
 
 
 def get_user_model():
@@ -23,7 +27,6 @@ def get_employee_model():
 # Декораторы будем импортировать внутри функций или создавать локальные версии
 def role_required(allowed_roles):
     """Локальная версия декоратора role_required"""
-    from django.http import HttpResponseForbidden
     from functools import wraps
 
     def decorator(view_func):
@@ -50,9 +53,114 @@ def admin_required(view_func):
     return role_required(['admin'])(view_func)
 
 
+# Миксин для классовых представлений
+class RoleRequiredMixin:
+    """Миксин для проверки ролей пользователя в классовых представлениях"""
+    allowed_roles = []
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.role not in self.allowed_roles:
+            return HttpResponseForbidden("У вас нет доступа к этой странице.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+# Классовые представления CRUD
+class ClientListView(LoginRequiredMixin, RoleRequiredMixin, ListView):
+    """Список клиентов - классовая версия"""
+    template_name = 'clients/client_list.html'
+    context_object_name = 'clients'
+    paginate_by = 20
+    allowed_roles = ['employee', 'admin']
+
+    def get_queryset(self):
+        Client = get_client_model()
+        return Client.objects.select_related('user').all().order_by('-created_at')
+
+
+class ClientDetailView(LoginRequiredMixin, DetailView):
+    """Детальная информация о клиенте - классовая версия"""
+    template_name = 'clients/client_detail.html'
+    context_object_name = 'client'
+
+    def get_queryset(self):
+        Client = get_client_model()
+        if self.request.user.role == 'client':
+            return Client.objects.filter(user=self.request.user).select_related('user')
+        return Client.objects.all().select_related('user')
+
+    def get(self, request, *args, **kwargs):
+        client = self.get_object()
+        if request.user.role == 'client' and client.user != request.user:
+            messages.error(request, 'У вас нет доступа к этому профилю')
+            return redirect('clients:client_detail', pk=request.user.client.pk)
+        return super().get(request, *args, **kwargs)
+
+
+class ClientCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
+    """Создание нового клиента - классовая версия"""
+    template_name = 'clients/client_form.html'
+    success_url = reverse_lazy('clients:client_list')
+    allowed_roles = ['employee', 'admin']
+
+    def get_form_class(self):
+        from .forms import ClientForm
+        return ClientForm
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Клиент {self.object.full_name} успешно создан')
+        return response
+
+    def form_invalid(self, form):
+        messages.error(self.request, 'Пожалуйста, исправьте ошибки в форме')
+        return super().form_invalid(form)
+
+
+class ClientUpdateView(LoginRequiredMixin, RoleRequiredMixin, UpdateView):
+    """Редактирование клиента - классовая версия"""
+    template_name = 'clients/client_form.html'
+    context_object_name = 'client'
+    allowed_roles = ['employee', 'admin']
+
+    def get_queryset(self):
+        Client = get_client_model()
+        return Client.objects.all().select_related('user')
+
+    def get_form_class(self):
+        from .forms import ClientForm
+        return ClientForm
+
+    def get_success_url(self):
+        return reverse_lazy('clients:client_detail', kwargs={'pk': self.object.pk})
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Данные клиента {self.object.full_name} успешно обновлены')
+        return response
+
+
+class ClientDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
+    """Удаление клиента - классовая версия"""
+    template_name = 'clients/client_confirm_delete.html'
+    success_url = reverse_lazy('clients:client_list')
+    allowed_roles = ['admin']
+
+    def get_queryset(self):
+        Client = get_client_model()
+        return Client.objects.all().select_related('user')
+
+    def delete(self, request, *args, **kwargs):
+        client = self.get_object()
+        messages.success(request, f'Клиент {client.full_name} успешно удален')
+        return super().delete(request, *args, **kwargs)
+
+
+# Существующие функциональные представления (оставляем для обратной совместимости)
 @login_required
-def client_list(request):
-    """Список клиентов"""
+def client_list_old(request):
+    """Список клиентов - старая версия"""
     User = get_user_model()
     Client = get_client_model()
 
@@ -68,8 +176,8 @@ def client_list(request):
 
 @login_required
 @employee_required
-def client_create(request):
-    """Создание нового клиента"""
+def client_create_old(request):
+    """Создание нового клиента - старая версия"""
     if request.method == 'POST':
         # Здесь будет логика создания клиента
         messages.success(request, 'Клиент успешно создан')
@@ -78,8 +186,8 @@ def client_create(request):
 
 
 @login_required
-def client_detail(request, pk):
-    """Детальная информация о клиенте"""
+def client_detail_old(request, pk):
+    """Детальная информация о клиенте - старая версия"""
     Client = get_client_model()
     User = get_user_model()
 
@@ -95,8 +203,8 @@ def client_detail(request, pk):
 
 @login_required
 @employee_required
-def client_update(request, pk):
-    """Редактирование клиента"""
+def client_update_old(request, pk):
+    """Редактирование клиента - старая версия"""
     Client = get_client_model()
     client = get_object_or_404(Client, pk=pk)
 
@@ -109,8 +217,8 @@ def client_update(request, pk):
 
 @login_required
 @employee_required
-def client_delete(request, pk):
-    """Удаление клиента"""
+def client_delete_old(request, pk):
+    """Удаление клиента - старая версия"""
     Client = get_client_model()
     client = get_object_or_404(Client, pk=pk)
 
@@ -121,6 +229,7 @@ def client_delete(request, pk):
     return render(request, 'clients/client_confirm_delete.html', {'client': client})
 
 
+# Специальные представления (оставляем без изменений)
 @login_required
 def client_documents(request, pk):
     """Документы клиента"""

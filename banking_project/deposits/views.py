@@ -3,6 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.apps import apps
 from django.http import HttpResponseForbidden
+from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
 
 
 def get_user_model():
@@ -52,9 +55,124 @@ def employee_required(view_func):
     return role_required(['employee', 'admin'])(view_func)
 
 
+# Миксин для классовых представлений
+class RoleRequiredMixin:
+    """Миксин для проверки ролей пользователя в классовых представлениях"""
+    allowed_roles = []
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.role not in self.allowed_roles:
+            return HttpResponseForbidden("У вас нет доступа к этой странице.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+# Классовые представления CRUD
+class DepositListView(LoginRequiredMixin, ListView):
+    """Список депозитов - классовая версия"""
+    template_name = 'deposits/deposit_list.html'
+    context_object_name = 'deposits'
+    paginate_by = 20
+
+    def get_queryset(self):
+        Deposit = get_deposit_model()
+        Client = get_client_model()
+
+        if self.request.user.role == 'client':
+            client = get_object_or_404(Client, user=self.request.user)
+            deposits = client.deposits.all()
+        else:
+            deposits = Deposit.objects.all()
+
+        return deposits.select_related('client', 'client__user').order_by('-created_at')
+
+
+class DepositDetailView(LoginRequiredMixin, DetailView):
+    """Детальная информация о депозите - классовая версия"""
+    template_name = 'deposits/deposit_detail.html'
+    context_object_name = 'deposit'
+
+    def get_queryset(self):
+        Deposit = get_deposit_model()
+        Client = get_client_model()
+
+        if self.request.user.role == 'client':
+            client = get_object_or_404(Client, user=self.request.user)
+            return Deposit.objects.filter(client=client).select_related('client', 'client__user')
+        return Deposit.objects.all().select_related('client', 'client__user')
+
+    def get(self, request, *args, **kwargs):
+        deposit = self.get_object()
+        if request.user.role == 'client' and deposit.client.user != request.user:
+            messages.error(request, 'У вас нет доступа к этому депозиту')
+            return redirect('deposits:deposit_list')
+        return super().get(request, *args, **kwargs)
+
+
+class DepositCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
+    """Создание нового депозита - классовая версия"""
+    template_name = 'deposits/deposit_form.html'
+    success_url = reverse_lazy('deposits:deposit_list')
+    allowed_roles = ['employee', 'admin']
+
+    def get_form_class(self):
+        from .forms import DepositForm
+        return DepositForm
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Депозит для {self.object.client.full_name} успешно создан')
+        return response
+
+    def form_invalid(self, form):
+        messages.error(self.request, 'Пожалуйста, исправьте ошибки в форме')
+        return super().form_invalid(form)
+
+
+class DepositUpdateView(LoginRequiredMixin, RoleRequiredMixin, UpdateView):
+    """Редактирование депозита - классовая версия"""
+    template_name = 'deposits/deposit_form.html'
+    context_object_name = 'deposit'
+    allowed_roles = ['employee', 'admin']
+
+    def get_queryset(self):
+        Deposit = get_deposit_model()
+        return Deposit.objects.all().select_related('client', 'client__user')
+
+    def get_form_class(self):
+        from .forms import DepositForm
+        return DepositForm
+
+    def get_success_url(self):
+        return reverse_lazy('deposits:deposit_detail', kwargs={'pk': self.object.pk})
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Депозит успешно обновлен')
+        return response
+
+
+class DepositDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
+    """Удаление депозита - классовая версия"""
+    template_name = 'deposits/deposit_confirm_delete.html'
+    success_url = reverse_lazy('deposits:deposit_list')
+    allowed_roles = ['admin']
+
+    def get_queryset(self):
+        Deposit = get_deposit_model()
+        return Deposit.objects.all().select_related('client', 'client__user')
+
+    def delete(self, request, *args, **kwargs):
+        deposit = self.get_object()
+        messages.success(request, f'Депозит успешно удален')
+        return super().delete(request, *args, **kwargs)
+
+
+# Существующие функциональные представления (оставляем без изменений)
 @login_required
-def deposit_list(request):
-    """Список депозитов"""
+def deposit_list_old(request):
+    """Список депозитов - старая версия"""
     User = get_user_model()
     Client = get_client_model()
     Deposit = get_deposit_model()
@@ -96,8 +214,8 @@ def deposit_open(request):
 
 
 @login_required
-def deposit_detail(request, pk):
-    """Детальная информация о депозите"""
+def deposit_detail_old(request, pk):
+    """Детальная информация о депозите - старая версия"""
     Deposit = get_deposit_model()
     Client = get_client_model()
     User = get_user_model()

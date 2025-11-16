@@ -4,6 +4,9 @@ from django.contrib import messages
 from django.db.models import Q
 from django.apps import apps
 from django.http import HttpResponseForbidden
+from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
 
 
 def get_user_model():
@@ -62,9 +65,126 @@ def admin_required(view_func):
     return role_required(['admin'])(view_func)
 
 
+# Миксин для классовых представлений
+class RoleRequiredMixin:
+    """Миксин для проверки ролей пользователя в классовых представлениях"""
+    allowed_roles = []
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.role not in self.allowed_roles:
+            return HttpResponseForbidden("У вас нет доступа к этой странице.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+# Классовые представления CRUD
+class CreditListView(LoginRequiredMixin, ListView):
+    """Список кредитов - классовая версия"""
+    template_name = 'credits/credit_list.html'
+    context_object_name = 'credits'
+    paginate_by = 20
+
+    def get_queryset(self):
+        Credit = get_credit_model()
+        Client = get_client_model()
+
+        if self.request.user.role == 'client':
+            # Клиенты видят только свои кредиты
+            client = get_object_or_404(Client, user=self.request.user)
+            credits = client.credits.all()
+        else:
+            # Сотрудники и админы видят все кредиты
+            credits = Credit.objects.all()
+
+        return credits.select_related('client', 'client__user').order_by('-created_at')
+
+
+class CreditDetailView(LoginRequiredMixin, DetailView):
+    """Детальная информация о кредите - классовая версия"""
+    template_name = 'credits/credit_detail.html'
+    context_object_name = 'credit'
+
+    def get_queryset(self):
+        Credit = get_credit_model()
+        Client = get_client_model()
+
+        if self.request.user.role == 'client':
+            client = get_object_or_404(Client, user=self.request.user)
+            return Credit.objects.filter(client=client).select_related('client', 'client__user')
+        return Credit.objects.all().select_related('client', 'client__user')
+
+    def get(self, request, *args, **kwargs):
+        credit = self.get_object()
+        if request.user.role == 'client' and credit.client.user != request.user:
+            messages.error(request, 'У вас нет доступа к этому кредиту')
+            return redirect('credits:credit_list')
+        return super().get(request, *args, **kwargs)
+
+
+class CreditCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
+    """Создание нового кредита - классовая версия"""
+    template_name = 'credits/credit_form.html'
+    success_url = reverse_lazy('credits:credit_list')
+    allowed_roles = ['employee', 'admin']
+
+    def get_form_class(self):
+        from .forms import CreditForm
+        return CreditForm
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Кредит для {self.object.client.full_name} успешно создан')
+        return response
+
+    def form_invalid(self, form):
+        messages.error(self.request, 'Пожалуйста, исправьте ошибки в форме')
+        return super().form_invalid(form)
+
+
+class CreditUpdateView(LoginRequiredMixin, RoleRequiredMixin, UpdateView):
+    """Редактирование кредита - классовая версия"""
+    template_name = 'credits/credit_form.html'
+    context_object_name = 'credit'
+    allowed_roles = ['employee', 'admin']
+
+    def get_queryset(self):
+        Credit = get_credit_model()
+        return Credit.objects.all().select_related('client', 'client__user')
+
+    def get_form_class(self):
+        from .forms import CreditForm
+        return CreditForm
+
+    def get_success_url(self):
+        return reverse_lazy('credits:credit_detail', kwargs={'pk': self.object.pk})
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Кредит успешно обновлен')
+        return response
+
+
+class CreditDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
+    """Удаление кредита - классовая версия"""
+    template_name = 'credits/credit_confirm_delete.html'
+    success_url = reverse_lazy('credits:credit_list')
+    allowed_roles = ['admin']
+
+    def get_queryset(self):
+        Credit = get_credit_model()
+        return Credit.objects.all().select_related('client', 'client__user')
+
+    def delete(self, request, *args, **kwargs):
+        credit = self.get_object()
+        messages.success(request, f'Кредит успешно удален')
+        return super().delete(request, *args, **kwargs)
+
+
+# Существующие функциональные представления (оставляем без изменений)
 @login_required
-def credit_list(request):
-    """Список кредитов"""
+def credit_list_old(request):
+    """Список кредитов - старая версия"""
     User = get_user_model()
     Client = get_client_model()
     Credit = get_credit_model()
@@ -112,8 +232,8 @@ def credit_apply(request):
 
 
 @login_required
-def credit_detail(request, pk):
-    """Детальная информация о кредите"""
+def credit_detail_old(request, pk):
+    """Детальная информация о кредите - старая версия"""
     Credit = get_credit_model()
     Client = get_client_model()
     User = get_user_model()

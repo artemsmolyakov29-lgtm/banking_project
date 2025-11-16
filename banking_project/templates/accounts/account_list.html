@@ -1,75 +1,81 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Счета{% endblock %}
+{% block title %}Счета - Банковская система{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Управление счетами</h1>
-        <a href="{% url 'accounts:account_create' %}" class="btn btn-primary">
-            Открыть новый счет
-        </a>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="fas fa-wallet me-2"></i>Счета
+    </h1>
+    {% if user.role in 'employee,admin' %}
+    <a href="{% url 'accounts:account_create' %}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Открыть счет
+    </a>
+    {% endif %}
+</div>
 
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">Список счетов</h5>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Номер счета</th>
-                            <th>Клиент</th>
-                            <th>Тип счета</th>
-                            <th>Баланс</th>
-                            <th>Валюта</th>
-                            <th>Статус</th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for account in accounts %}
-                        <tr>
-                            <td>{{ account.account_number }}</td>
-                            <td>
-                                <a href="{% url 'clients:client_detail' account.client.id %}">
-                                    {{ account.client.get_full_name }}
-                                </a>
-                            </td>
-                            <td>{{ account.get_account_type_display }}</td>
-                            <td>{{ account.balance }} {{ account.currency }}</td>
-                            <td>{{ account.currency }}</td>
-                            <td>
-                                {% if account.is_active %}
-                                <span class="badge bg-success">Активен</span>
-                                {% else %}
-                                <span class="badge bg-danger">Закрыт</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'accounts:account_detail' account.id %}" class="btn btn-outline-primary">
-                                        Просмотр
-                                    </a>
-                                    <a href="{% url 'accounts:account_update' account.id %}" class="btn btn-outline-secondary">
-                                        Редактировать
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center py-4">
-                                Счета не найдены
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+<!-- Сообщения -->
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="row">
+    {% for account in accounts %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="badge bg-{% if account.status == 'active' %}success{% elif account.status == 'blocked' %}danger{% else %}secondary{% endif %}">
+                    {{ account.get_status_display }}
+                </span>
+                <small class="text-muted">{{ account.get_account_type_display }}</small>
+            </div>
+            <div class="card-body">
+                <h6 class="card-title">{{ account.account_number }}</h6>
+                <p class="card-text">
+                    <strong>Баланс:</strong> {{ account.balance }} {{ account.currency }}<br>
+                    <strong>Владелец:</strong> {{ account.client.full_name }}<br>
+                    <strong>Процентная ставка:</strong> {{ account.interest_rate }}%
+                </p>
+            </div>
+            <div class="card-footer">
+                <div class="btn-group w-100">
+                    <a href="{% url 'accounts:account_detail' account.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    {% if user.role in 'employee,admin' %}
+                    <a href="{% url 'accounts:account_update' account.pk %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    {% endif %}
+                    {% if user.role == 'admin' %}
+                    <a href="{% url 'accounts:account_delete' account.pk %}" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="text-center py-5">
+            <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Счета не найдены</p>
+            {% if user.role in 'employee,admin' %}
+            <a href="{% url 'accounts:account_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Открыть первый счет
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}

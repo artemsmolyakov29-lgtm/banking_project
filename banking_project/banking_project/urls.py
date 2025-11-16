@@ -16,6 +16,9 @@ urlpatterns = [
     path('transactions/', include('transactions.urls')),
     path('audit/', include('audit.urls')),
     path('reports/', include('reports.urls')),
+    path('credits/', include('credits.urls')),
+    path('deposits/', include('deposits.urls')),
+    path('cards/', include('cards.urls')),
 ]
 
 if settings.DEBUG:

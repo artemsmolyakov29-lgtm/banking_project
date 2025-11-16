@@ -1,21 +1,35 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Клиент {{ client.get_full_name }}{% endblock %}
 
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
+<li class="breadcrumb-item active">{{ client.get_full_name }}</li>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Все клиенты</a></li>
-            <li class="breadcrumb-item active">{{ client.get_full_name }}</li>
-        </ol>
-    </nav>
+    <!-- Сообщения -->
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="row">
         <div class="col-lg-8">
+            <!-- Основная информация -->
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Основная информация</h5>
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user me-2"></i>Основная информация
+                    </h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -24,6 +38,13 @@
                             <p><strong>Дата рождения:</strong><br>{{ client.birth_date|date:"d.m.Y" }}</p>
                             <p><strong>Паспорт:</strong><br>{{ client.passport_number }}</p>
                             <p><strong>ИНН:</strong><br>{{ client.tax_id }}</p>
+                            {% if client.credit_rating %}
+                            <p><strong>Кредитный рейтинг:</strong><br>
+                                <span class="badge {% if client.credit_rating >= 80 %}bg-success{% elif client.credit_rating >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ client.credit_rating }}/100
+                                </span>
+                            </p>
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
                             <p><strong>Email:</strong><br>{{ client.email }}</p>
@@ -34,104 +55,468 @@
                                 {% else %}
                                 <span class="badge bg-danger">Неактивен</span>
                                 {% endif %}
+                                {% if client.is_vip %}
+                                <span class="badge bg-warning ms-1">VIP</span>
+                                {% endif %}
                             </p>
-                            <p><strong>Дата регистрации:</strong><br>{{ client.created_at|date:"d.m.Y" }}</p>
+                            <p><strong>Дата регистрации:</strong><br>{{ client.created_at|date:"d.m.Y H:i" }}</p>
+                            {% if client.updated_at %}
+                            <p><strong>Последнее обновление:</strong><br>{{ client.updated_at|date:"d.m.Y H:i" }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <p><strong>Адрес регистрации:</strong><br>{{ client.address|default:"Не указан" }}</p>
+                            {% if client.actual_address %}
+                            <p><strong>Фактический адрес:</strong><br>{{ client.actual_address }}</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">Счета</h6>
-                        </div>
-                        <div class="card-body">
-                            {% for account in client.accounts.all %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div>
-                                    <strong>{{ account.account_number }}</strong><br>
-                                    <small class="text-muted">{{ account.balance }} {{ account.currency }}</small>
-                                </div>
-                                <span class="badge bg-{% if account.is_active %}success{% else %}secondary{% endif %}">
-                                    {{ account.get_account_type_display }}
-                                </span>
-                            </div>
-                            {% empty %}
-                            <p class="text-muted">Счета отсутствуют</p>
-                            {% endfor %}
-                        </div>
-                    </div>
+            <!-- Вкладки для связанных объектов -->
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="clientTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="accounts-tab" data-bs-toggle="tab" data-bs-target="#accounts" type="button" role="tab">
+                                <i class="fas fa-wallet me-1"></i>Счета
+                                <span class="badge bg-primary ms-1">{{ client.accounts.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="credits-tab" data-bs-toggle="tab" data-bs-target="#credits" type="button" role="tab">
+                                <i class="fas fa-hand-holding-usd me-1"></i>Кредиты
+                                <span class="badge bg-primary ms-1">{{ client.credits.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="deposits-tab" data-bs-toggle="tab" data-bs-target="#deposits" type="button" role="tab">
+                                <i class="fas fa-piggy-bank me-1"></i>Депозиты
+                                <span class="badge bg-primary ms-1">{{ client.deposits.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="cards-tab" data-bs-toggle="tab" data-bs-target="#cards" type="button" role="tab">
+                                <i class="fas fa-credit-card me-1"></i>Карты
+                                <span class="badge bg-primary ms-1">{{ client.cards.count }}</span>
+                            </button>
+                        </li>
+                    </ul>
                 </div>
-                <div class="col-md-6">
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">Кредиты</h6>
-                        </div>
-                        <div class="card-body">
-                            {% for credit in client.credits.all %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div>
-                                    <strong>{{ credit.credit_number }}</strong><br>
-                                    <small class="text-muted">{{ credit.remaining_amount }} {{ credit.currency }}</small>
-                                </div>
-                                <span class="badge bg-{% if credit.status == 'ACTIVE' %}success{% else %}warning{% endif %}">
-                                    {{ credit.get_status_display }}
-                                </span>
+                <div class="card-body">
+                    <div class="tab-content" id="clientTabsContent">
+                        <!-- Вкладка Счета -->
+                        <div class="tab-pane fade show active" id="accounts" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Банковские счета</h6>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'accounts:account_create' %}?client={{ client.id }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-plus me-1"></i>Открыть счет
+                                </a>
+                                {% endif %}
                             </div>
-                            {% empty %}
-                            <p class="text-muted">Кредиты отсутствуют</p>
-                            {% endfor %}
+
+                            {% if client.accounts.all %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Номер счета</th>
+                                            <th>Тип</th>
+                                            <th>Баланс</th>
+                                            <th>Валюта</th>
+                                            <th>Статус</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for account in client.accounts.all %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ account.account_number }}</strong>
+                                                {% if account.is_primary %}
+                                                <span class="badge bg-warning ms-1">Основной</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ account.get_account_type_display }}</td>
+                                            <td>
+                                                <strong>{{ account.balance }}</strong>
+                                            </td>
+                                            <td>{{ account.currency }}</td>
+                                            <td>
+                                                <span class="badge {% if account.status == 'active' %}bg-success{% elif account.status == 'blocked' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                    {{ account.get_status_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'accounts:account_detail' account.id %}" class="btn btn-outline-primary" title="Просмотр">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if user.role in 'employee,admin' %}
+                                                    <a href="{% url 'accounts:account_update' account.id %}" class="btn btn-outline-secondary" title="Редактировать">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-wallet fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">Счета отсутствуют</p>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'accounts:account_create' %}?client={{ client.id }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-1"></i>Открыть первый счет
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Вкладка Кредиты -->
+                        <div class="tab-pane fade" id="credits" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Кредитные договоры</h6>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'credits:credit_create' %}?client={{ client.id }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-plus me-1"></i>Оформить кредит
+                                </a>
+                                {% endif %}
+                            </div>
+
+                            {% if client.credits.all %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Номер кредита</th>
+                                            <th>Тип</th>
+                                            <th>Сумма</th>
+                                            <th>Ставка</th>
+                                            <th>Остаток</th>
+                                            <th>Статус</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for credit in client.credits.all %}
+                                        <tr>
+                                            <td><strong>{{ credit.credit_number|default:"—" }}</strong></td>
+                                            <td>{{ credit.get_credit_type_display }}</td>
+                                            <td>
+                                                <strong>{{ credit.amount }} руб.</strong>
+                                            </td>
+                                            <td>{{ credit.interest_rate }}%</td>
+                                            <td>
+                                                {% if credit.remaining_amount %}
+                                                <span class="text-{% if credit.remaining_amount > 0 %}danger{% else %}success{% endif %}">
+                                                    {{ credit.remaining_amount }} руб.
+                                                </span>
+                                                {% else %}
+                                                <span class="text-muted">—</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if credit.status == 'active' %}
+                                                <span class="badge bg-success">Активен</span>
+                                                {% elif credit.status == 'approved' %}
+                                                <span class="badge bg-info">Одобрен</span>
+                                                {% elif credit.status == 'pending' %}
+                                                <span class="badge bg-warning">На рассмотрении</span>
+                                                {% elif credit.status == 'rejected' %}
+                                                <span class="badge bg-danger">Отклонен</span>
+                                                {% elif credit.status == 'closed' %}
+                                                <span class="badge bg-secondary">Закрыт</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">{{ credit.get_status_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-outline-primary" title="Просмотр">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if user.role in 'employee,admin' %}
+                                                    <a href="{% url 'credits:credit_update' credit.id %}" class="btn btn-outline-secondary" title="Редактировать">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-hand-holding-usd fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">Кредиты отсутствуют</p>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'credits:credit_create' %}?client={{ client.id }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-1"></i>Оформить первый кредит
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Вкладка Депозиты -->
+                        <div class="tab-pane fade" id="deposits" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Депозитные договоры</h6>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'deposits:deposit_create' %}?client={{ client.id }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-plus me-1"></i>Открыть депозит
+                                </a>
+                                {% endif %}
+                            </div>
+
+                            {% if client.deposits.all %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Номер депозита</th>
+                                            <th>Тип</th>
+                                            <th>Сумма</th>
+                                            <th>Ставка</th>
+                                            <th>Срок</th>
+                                            <th>Доход</th>
+                                            <th>Статус</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for deposit in client.deposits.all %}
+                                        <tr>
+                                            <td><strong>{{ deposit.deposit_number|default:"—" }}</strong></td>
+                                            <td>{{ deposit.get_deposit_type_display }}</td>
+                                            <td>
+                                                <strong>{{ deposit.amount }} {{ deposit.currency|default:"руб." }}</strong>
+                                            </td>
+                                            <td>{{ deposit.interest_rate }}%</td>
+                                            <td>{{ deposit.term_months }} мес.</td>
+                                            <td>
+                                                {% if deposit.calculated_interest %}
+                                                <span class="text-success">+{{ deposit.calculated_interest }} {{ deposit.currency|default:"руб." }}</span>
+                                                {% else %}
+                                                <span class="text-muted">—</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if deposit.status == 'active' %}
+                                                <span class="badge bg-success">Активен</span>
+                                                {% elif deposit.status == 'closed' %}
+                                                <span class="badge bg-secondary">Закрыт</span>
+                                                {% elif deposit.status == 'matured' %}
+                                                <span class="badge bg-info">Истек</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">{{ deposit.get_status_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'deposits:deposit_detail' deposit.id %}" class="btn btn-outline-primary" title="Просмотр">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if user.role in 'employee,admin' %}
+                                                    <a href="{% url 'deposits:deposit_update' deposit.id %}" class="btn btn-outline-secondary" title="Редактировать">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-piggy-bank fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">Депозиты отсутствуют</p>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'deposits:deposit_create' %}?client={{ client.id }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-1"></i>Открыть первый депозит
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Вкладка Карты -->
+                        <div class="tab-pane fade" id="cards" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Банковские карты</h6>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'cards:card_create' %}?client={{ client.id }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-plus me-1"></i>Выпустить карту
+                                </a>
+                                {% endif %}
+                            </div>
+
+                            {% if client.cards.all %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Номер карты</th>
+                                            <th>Тип</th>
+                                            <th>Платежная система</th>
+                                            <th>Срок действия</th>
+                                            <th>Статус</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for card in client.cards.all %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ card.card_number|default:"**** **** **** ****" }}</strong>
+                                                {% if card.is_virtual %}
+                                                <span class="badge bg-info ms-1">Виртуальная</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ card.get_card_type_display }}</td>
+                                            <td>{{ card.get_payment_system_display }}</td>
+                                            <td>{{ card.expiry_date|date:"m/Y"|default:"Не указан" }}</td>
+                                            <td>
+                                                {% if card.status == 'active' %}
+                                                <span class="badge bg-success">Активна</span>
+                                                {% elif card.status == 'blocked' %}
+                                                <span class="badge bg-danger">Заблокирована</span>
+                                                {% elif card.status == 'expired' %}
+                                                <span class="badge bg-warning">Просрочена</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">{{ card.get_status_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'cards:card_detail' card.id %}" class="btn btn-outline-primary" title="Просмотр">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if user.role in 'employee,admin' %}
+                                                    <a href="{% url 'cards:card_update' card.id %}" class="btn btn-outline-secondary" title="Редактировать">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-credit-card fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">Карты отсутствуют</p>
+                                {% if user.role in 'employee,admin' %}
+                                <a href="{% url 'cards:card_create' %}?client={{ client.id }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-1"></i>Выпустить первую карту
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Боковая панель -->
         <div class="col-lg-4">
+            <!-- Действия -->
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Действия</h5>
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>Действия
+                    </h5>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
+                        {% if user.role in 'employee,admin' %}
                         <a href="{% url 'clients:client_update' client.id %}" class="btn btn-primary">
-                            Редактировать
+                            <i class="fas fa-edit me-1"></i>Редактировать
                         </a>
+                        {% endif %}
                         <a href="{% url 'clients:client_contacts' client.id %}" class="btn btn-outline-info">
-                            Контакты
+                            <i class="fas fa-address-book me-1"></i>Контакты
                         </a>
                         <a href="{% url 'clients:client_documents' client.id %}" class="btn btn-outline-warning">
-                            Документы
+                            <i class="fas fa-file-alt me-1"></i>Документы
                         </a>
+                        {% if user.role in 'employee,admin' %}
                         <a href="{% url 'accounts:account_create' %}?client={{ client.id }}" class="btn btn-outline-success">
-                            Открыть счет
+                            <i class="fas fa-plus me-1"></i>Открыть счет
                         </a>
                         <a href="{% url 'credits:credit_create' %}?client={{ client.id }}" class="btn btn-outline-secondary">
-                            Оформить кредит
+                            <i class="fas fa-hand-holding-usd me-1"></i>Оформить кредит
+                        </a>
+                        <a href="{% url 'deposits:deposit_create' %}?client={{ client.id }}" class="btn btn-outline-info">
+                            <i class="fas fa-piggy-bank me-1"></i>Открыть депозит
+                        </a>
+                        <a href="{% url 'cards:card_create' %}?client={{ client.id }}" class="btn btn-outline-dark">
+                            <i class="fas fa-credit-card me-1"></i>Выпустить карту
                         </a>
                         {% if client.is_active %}
-                        <a href="{% url 'clients:client_confirm_delete' client.id %}" class="btn btn-outline-danger">
-                            Удалить
+                        <a href="{% url 'clients:client_delete' client.id %}" class="btn btn-outline-danger">
+                            <i class="fas fa-trash me-1"></i>Удалить
                         </a>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </div>
             </div>
 
+            <!-- Статистика -->
             <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Статистика</h5>
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Статистика
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p><strong>Всего счетов:</strong> {{ client.accounts.count }}</p>
                     <p><strong>Активных кредитов:</strong> {{ client.credits.active.count }}</p>
-                    <p><strong>Общий баланс:</strong> {{ client.total_balance }} RUB</p>
-                    <p><strong>Последняя активность:</strong><br>{{ client.last_activity|date:"d.m.Y H:i" }}</p>
+                    <p><strong>Открытых депозитов:</strong> {{ client.deposits.active.count }}</p>
+                    <p><strong>Активных карт:</strong> {{ client.cards.active.count }}</p>
+                    <p><strong>Общий баланс:</strong> {{ client.total_balance|default:0 }} RUB</p>
+                    <p><strong>Кредитный рейтинг:</strong>
+                        <span class="badge {% if client.credit_rating >= 80 %}bg-success{% elif client.credit_rating >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ client.credit_rating|default:"—" }}/100
+                        </span>
+                    </p>
+                    <p><strong>Последняя активность:</strong><br>{{ client.last_activity|date:"d.m.Y H:i"|default:"—" }}</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Активация вкладок Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    var triggerTabList = [].slice.call(document.querySelectorAll('#clientTabs button'))
+    triggerTabList.forEach(function (triggerEl) {
+        var tabTrigger = new bootstrap.Tab(triggerEl)
+        triggerEl.addEventListener('click', function (event) {
+            event.preventDefault()
+            tabTrigger.show()
+        })
+    })
+});
+</script>
 {% endblock %}
