@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}Оплата кредита {{ credit.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит {{ credit.contract_number }}</a></li>
+            <li class="breadcrumb-item active">Оплата кредита</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Оплата кредита</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Информация о кредите -->
+                    <div class="alert alert-info">
+                        <h6>Информация о кредите:</h6>
+                        <ul class="mb-0">
+                            <li>Кредит: {{ credit.contract_number }}</li>
+                            <li>Клиент: {{ credit.client.get_full_name }}</li>
+                            <li>Остаток долга: {{ credit.remaining_balance }} {{ credit.account.currency.code }}</li>
+                            <li>Следующий платеж: {{ next_payment_amount }} {{ credit.account.currency.code }}</li>
+                            {% if penalty_amount > 0 %}
+                            <li class="text-danger">Штрафы: {{ penalty_amount }} {{ credit.account.currency.code }}</li>
+                            <li class="fw-bold">Всего к оплате: {{ total_due }} {{ credit.account.currency.code }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <!-- Форма оплаты -->
+                    <form method="post" class="payment-form">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label>Сумма платежа</label>
+                                    <input type="number"
+                                           name="amount"
+                                           class="form-control"
+                                           step="0.01"
+                                           min="{{ total_due }}"
+                                           value="{{ total_due }}"
+                                           required>
+                                    {% if form.amount.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.amount.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        Минимальная сумма: {{ total_due }} {{ credit.account.currency.code }}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label>Способ оплаты</label>
+                                    <select name="payment_method" class="form-select" required>
+                                        <option value="manual">Ручной платеж</option>
+                                        <option value="transfer">Банковский перевод</option>
+                                    </select>
+                                    {% if form.payment_method.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.payment_method.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label>Примечания</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Дополнительные примечания к платежу"></textarea>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Внимание!</h6>
+                            <p class="mb-0">После подтверждения платеж будет выполнен немедленно. Убедитесь в правильности введенных данных.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-credit-card me-2"></i>Выполнить платеж
+                            </button>
+                            <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-secondary">Отмена</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelector('.payment-form').addEventListener('submit', function(e) {
+    const amountInput = this.querySelector('input[name="amount"]');
+    const amount = parseFloat(amountInput.value);
+    const minAmount = parseFloat(amountInput.min);
+
+    if (amount < minAmount) {
+        alert(`Минимальная сумма платежа: ${minAmount}`);
+        e.preventDefault();
+        return;
+    }
+
+    if (!confirm(`Вы уверены, что хотите выполнить платеж на сумму ${amount}?`)) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

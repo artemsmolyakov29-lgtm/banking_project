@@ -9,4 +9,8 @@ urlpatterns = [
     path('create/', views.transaction_create, name='transaction_create'),
     path('fees/', views.transaction_fees, name='transaction_fees'),
     path('report/', views.transaction_report, name='transaction_report'),
+
+    path('transfer/', views.transfer_view, name='transfer'),
+    path('transfer/success/<int:transaction_id>/', views.transfer_success, name='transfer_success'),
+    path('history/', views.transaction_history, name='history'),
 ]

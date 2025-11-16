@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Перевод выполнен успешно{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="card-title mb-0">Перевод выполнен успешно!</h4>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                </div>
+
+                <h5>Детали операции:</h5>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <tr>
+                            <th>Номер транзакции:</th>
+                            <td>#{{ transaction.id }}</td>
+                        </tr>
+                        <tr>
+                            <th>Счет отправителя:</th>
+                            <td>{{ transaction.from_account.account_number }}</td>
+                        </tr>
+                        <tr>
+                            <th>Счет получателя:</th>
+                            <td>{{ transaction.to_account.account_number }}</td>
+                        </tr>
+                        <tr>
+                            <th>Сумма перевода:</th>
+                            <td>{{ transaction.amount }} {{ transaction.from_account.currency }}</td>
+                        </tr>
+                        <tr>
+                            <th>Комиссия:</th>
+                            <td>{{ transaction.fee }} {{ transaction.from_account.currency }}</td>
+                        </tr>
+                        <tr>
+                            <th>Дата и время:</th>
+                            <td>{{ transaction.executed_at|date:"d.m.Y H:i" }}</td>
+                        </tr>
+                        {% if transaction.description %}
+                        <tr>
+                            <th>Описание:</th>
+                            <td>{{ transaction.description }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+
+                <div class="mt-4">
+                    <a href="{% url 'transactions:transfer' %}" class="btn btn-primary">Новый перевод</a>
+                    <a href="{% url 'transactions:history' %}" class="btn btn-outline-primary">История операций</a>
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">В личный кабинет</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

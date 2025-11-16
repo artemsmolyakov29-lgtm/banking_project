@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Досрочное погашение - {{ credit.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит {{ credit.contract_number }}</a></li>
+            <li class="breadcrumb-item active">Досрочное погашение</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h4 class="card-title mb-0 text-white">Досрочное погашение кредита</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Информация о кредите -->
+                    <div class="alert alert-info">
+                        <h6>Информация о кредите:</h6>
+                        <ul class="mb-0">
+                            <li>Кредит: {{ credit.contract_number }}</li>
+                            <li>Клиент: {{ credit.client.get_full_name }}</li>
+                            <li>Остаток долга: {{ credit.remaining_balance }} {{ credit.account.currency.code }}</li>
+                            <li>Штрафы: {{ credit.calculate_penalty }} {{ credit.account.currency.code }}</li>
+                            <li class="fw-bold text-success">Сумма досрочного погашения: {{ early_repayment_amount }} {{ credit.account.currency.code }}</li>
+                        </ul>
+                    </div>
+
+                    <!-- Предупреждение -->
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Внимание!</h6>
+                        <ul class="mb-0">
+                            <li>Досрочное погашение приведет к полному закрытию кредита</li>
+                            <li>После подтверждения операция не может быть отменена</li>
+                            <li>Убедитесь, что на счете достаточно средств</li>
+                        </ul>
+                    </div>
+
+                    <!-- Форма досрочного погашения -->
+                    <form method="post" class="early-repayment-form">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="form-group mb-3">
+                            <label>Сумма досрочного погашения</label>
+                            <input type="text"
+                                   name="repayment_amount"
+                                   class="form-control"
+                                   value="{{ early_repayment_amount }}"
+                                   readonly>
+                            <small class="form-text text-muted">
+                                Сумма включает остаток основного долга и начисленные проценты
+                            </small>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="confirmation" id="confirmation" required>
+                                <label class="form-check-label" for="confirmation">
+                                    Я подтверждаю досрочное погашение кредита и понимаю, что операция не может быть отменена
+                                </label>
+                            </div>
+                            {% if form.confirmation.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.confirmation.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-warning btn-lg">
+                                <i class="fas fa-check-circle me-2"></i>Подтвердить досрочное погашение
+                            </button>
+                            <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-secondary">Отмена</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelector('.early-repayment-form').addEventListener('submit', function(e) {
+    const confirmation = this.querySelector('input[name="confirmation"]');
+
+    if (!confirmation.checked) {
+        alert('Необходимо подтвердить досрочное погашение');
+        e.preventDefault();
+        return;
+    }
+
+    if (!confirm('Вы уверены, что хотите погасить кредит досрочно? Операция не может быть отменена.')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

@@ -7,6 +7,9 @@ from django.http import HttpResponseForbidden
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
+from django.core.paginator import Paginator
+from decimal import Decimal
+from datetime import datetime, timedelta
 
 
 def get_user_model():
@@ -114,6 +117,22 @@ class CreditDetailView(LoginRequiredMixin, DetailView):
             return Credit.objects.filter(client=client).select_related('client', 'client__user')
         return Credit.objects.all().select_related('client', 'client__user')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        credit = self.object
+
+        # Добавляем информацию о следующем платеже
+        context['next_payment_amount'] = credit.calculate_next_payment()
+        context['penalty_amount'] = credit.calculate_penalty()
+        context['total_due'] = context['next_payment_amount'] + context['penalty_amount']
+        context['can_early_repay'] = credit.can_make_early_repayment()
+        context['early_repayment_amount'] = credit.calculate_early_repayment()
+
+        # Последние 5 платежей
+        context['recent_payments'] = credit.payments.all().order_by('-payment_date')[:5]
+
+        return context
+
     def get(self, request, *args, **kwargs):
         credit = self.get_object()
         if request.user.role == 'client' and credit.client.user != request.user:
@@ -179,6 +198,203 @@ class CreditDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
         credit = self.get_object()
         messages.success(request, f'Кредит успешно удален')
         return super().delete(request, *args, **kwargs)
+
+
+# НОВЫЕ ПРЕДСТАВЛЕНИЯ ДЛЯ ПЛАТЕЖЕЙ ПО КРЕДИТАМ
+
+@login_required
+def credit_payment_view(request, pk):
+    """Внесение платежа по кредиту"""
+    Credit = get_credit_model()
+    credit = get_object_or_404(Credit, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and credit.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к этому кредиту')
+        return redirect('credits:credit_list')
+
+    if request.method == 'POST':
+        from .forms import CreditPaymentForm
+        form = CreditPaymentForm(request.POST, credit=credit, user=request.user)
+        if form.is_valid():
+            success, message = form.save()
+            if success:
+                messages.success(request, message)
+                return redirect('credits:payment_success', pk=credit.pk)
+            else:
+                messages.error(request, message)
+    else:
+        from .forms import CreditPaymentForm
+        form = CreditPaymentForm(credit=credit, user=request.user)
+
+    return render(request, 'credits/credit_payment.html', {
+        'credit': credit,
+        'form': form,
+        'next_payment_amount': credit.calculate_next_payment(),
+        'penalty_amount': credit.calculate_penalty(),
+        'total_due': credit.calculate_next_payment() + credit.calculate_penalty()
+    })
+
+
+@login_required
+def early_repayment_view(request, pk):
+    """Досрочное погашение кредита"""
+    Credit = get_credit_model()
+    credit = get_object_or_404(Credit, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and credit.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к этому кредиту')
+        return redirect('credits:credit_list')
+
+    # Проверка возможности досрочного погашения
+    if not credit.can_make_early_repayment():
+        messages.error(request, 'Досрочное погашение для этого кредита не разрешено')
+        return redirect('credits:credit_detail', pk=credit.pk)
+
+    if request.method == 'POST':
+        from .forms import EarlyRepaymentForm
+        form = EarlyRepaymentForm(request.POST, credit=credit, user=request.user)
+        if form.is_valid():
+            success, message = form.save()
+            if success:
+                messages.success(request, message)
+                return redirect('credits:payment_success', pk=credit.pk)
+            else:
+                messages.error(request, message)
+    else:
+        from .forms import EarlyRepaymentForm
+        form = EarlyRepaymentForm(credit=credit, user=request.user)
+
+    return render(request, 'credits/early_repayment.html', {
+        'credit': credit,
+        'form': form,
+        'early_repayment_amount': credit.calculate_early_repayment()
+    })
+
+
+@login_required
+def payment_history_view(request, pk):
+    """История платежей по кредиту"""
+    Credit = get_credit_model()
+    CreditPayment = get_credit_payment_model()
+
+    credit = get_object_or_404(Credit, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and credit.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к платежам этого кредита')
+        return redirect('credits:credit_list')
+
+    payments = credit.payments.all().select_related('transaction').order_by('-payment_date')
+
+    # Фильтрация
+    status_filter = request.GET.get('status')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    if status_filter:
+        payments = payments.filter(status=status_filter)
+    if date_from:
+        payments = payments.filter(payment_date__gte=date_from)
+    if date_to:
+        payments = payments.filter(payment_date__lte=date_to)
+
+    # Пагинация
+    paginator = Paginator(payments, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'credits/payment_history.html', {
+        'credit': credit,
+        'page_obj': page_obj,
+        'payments_count': payments.count(),
+        'status_filter': status_filter,
+        'date_from': date_from,
+        'date_to': date_to
+    })
+
+
+@login_required
+def payment_schedule_view(request, pk):
+    """График платежей по кредиту с фильтрацией"""
+    Credit = get_credit_model()
+    credit = get_object_or_404(Credit, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and credit.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к графику платежей этого кредита')
+        return redirect('credits:credit_list')
+
+    from .forms import PaymentScheduleFilterForm
+    form = PaymentScheduleFilterForm(request.GET or None)
+
+    schedule = credit.generate_payment_schedule() if hasattr(credit, 'generate_payment_schedule') else []
+
+    # Применяем фильтры к графику
+    filtered_schedule = schedule
+    if form.is_valid():
+        date_from = form.cleaned_data.get('date_from')
+        date_to = form.cleaned_data.get('date_to')
+        status_filter = form.cleaned_data.get('status')
+
+        if date_from:
+            filtered_schedule = [p for p in filtered_schedule if p['payment_date'] >= date_from]
+        if date_to:
+            filtered_schedule = [p for p in filtered_schedule if p['payment_date'] <= date_to]
+
+        # Для статуса используем реальные платежи
+        if status_filter:
+            actual_payments = credit.payments.filter(status=status_filter).values_list('payment_number', flat=True)
+            filtered_schedule = [p for p in filtered_schedule if p['payment_number'] in actual_payments]
+
+    return render(request, 'credits/payment_schedule.html', {
+        'credit': credit,
+        'schedule': filtered_schedule,
+        'form': form,
+        'total_schedule': schedule
+    })
+
+
+@login_required
+def payment_success(request, pk):
+    """Страница успешного платежа"""
+    Credit = get_credit_model()
+    credit = get_object_or_404(Credit, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and credit.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к этому кредиту')
+        return redirect('credits:credit_list')
+
+    # Получаем последний платеж
+    last_payment = credit.payments.last()
+
+    return render(request, 'credits/payment_success.html', {
+        'credit': credit,
+        'last_payment': last_payment
+    })
+
+
+@login_required
+def calculate_penalty_view(request, pk):
+    """Расчет штрафов за просрочку"""
+    Credit = get_credit_model()
+    credit = get_object_or_404(Credit, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and credit.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к этому кредиту')
+        return redirect('credits:credit_list')
+
+    penalty_amount = credit.calculate_penalty()
+
+    return render(request, 'credits/calculate_penalty.html', {
+        'credit': credit,
+        'penalty_amount': penalty_amount,
+        'overdue_days': credit.overdue_days,
+        'overdue_amount': credit.overdue_amount
+    })
 
 
 # Существующие функциональные представления (оставляем без изменений)
@@ -275,8 +491,8 @@ def credit_payments(request, pk):
 
 
 @login_required
-def credit_payment(request, pk):
-    """Внесение платежа по кредиту"""
+def credit_payment_old(request, pk):
+    """Внесение платежа по кредиту - старая версия"""
     Credit = get_credit_model()
     CreditPayment = get_credit_payment_model()
     Account = get_account_model()

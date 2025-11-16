@@ -17,6 +17,8 @@ class AuditLog(models.Model):
         ('export', 'Экспорт данных'),
         ('backup', 'Резервное копирование'),
         ('restore', 'Восстановление'),
+        ('interest_accrual', 'Начисление процентов'),  # НОВЫЙ ТИП ДЕЙСТВИЯ
+        ('report_generate', 'Генерация отчета'),  # НОВЫЙ ТИП ДЕЙСТВИЯ
     )
 
     MODULE_CHOICES = (
@@ -29,6 +31,7 @@ class AuditLog(models.Model):
         ('transactions', 'Транзакции'),
         ('reports', 'Отчеты'),
         ('system', 'Система'),
+        ('interest', 'Проценты'),  # НОВЫЙ МОДУЛЬ
     )
 
     user = models.ForeignKey(
@@ -91,6 +94,12 @@ class AuditLog(models.Model):
         blank=True,
         verbose_name='Сообщение об ошибке'
     )
+    # НОВОЕ ПОЛЕ: Связанные объекты (для сложных операций)
+    related_objects = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Связанные объекты'
+    )
 
     class Meta:
         verbose_name = 'Запись аудита'
@@ -102,6 +111,7 @@ class AuditLog(models.Model):
             models.Index(fields=['module', 'timestamp']),
             models.Index(fields=['table_name', 'record_id']),
             models.Index(fields=['timestamp']),
+            models.Index(fields=['is_successful']),  # НОВЫЙ ИНДЕКС
         ]
 
     def __str__(self):
@@ -110,7 +120,8 @@ class AuditLog(models.Model):
     @classmethod
     def log_action(cls, user, action, module, table_name, record_id=None,
                    description='', ip_address=None, user_agent='',
-                   old_values=None, new_values=None, is_successful=True, error_message=''):
+                   old_values=None, new_values=None, is_successful=True,
+                   error_message='', related_objects=None):
         """
         Статический метод для удобного логирования действий
         """
@@ -126,7 +137,47 @@ class AuditLog(models.Model):
             old_values=old_values,
             new_values=new_values,
             is_successful=is_successful,
-            error_message=error_message
+            error_message=error_message,
+            related_objects=related_objects
+        )
+
+    @classmethod
+    def log_interest_accrual(cls, user, deposit, amount, is_successful=True, error_message=''):
+        """Специальный метод для логирования начисления процентов"""
+        description = f"Начисление процентов по депозиту {deposit.id}: {amount} {deposit.account.currency.code}"
+
+        related_objects = {
+            'deposit_id': deposit.id,
+            'client_id': deposit.client.id,
+            'amount': str(amount),
+            'currency': deposit.account.currency.code
+        }
+
+        return cls.log_action(
+            user=user,
+            action='interest_accrual',
+            module='interest',
+            table_name='DepositInterestPayment',
+            description=description,
+            is_successful=is_successful,
+            error_message=error_message,
+            related_objects=related_objects
+        )
+
+    @classmethod
+    def log_report_generation(cls, user, report_type, parameters, is_successful=True, error_message=''):
+        """Специальный метод для логирования генерации отчетов"""
+        description = f"Генерация отчета: {report_type}"
+
+        return cls.log_action(
+            user=user,
+            action='report_generate',
+            module='reports',
+            table_name='Report',
+            description=description,
+            is_successful=is_successful,
+            error_message=error_message,
+            related_objects={'report_type': report_type, 'parameters': parameters}
         )
 
 
@@ -177,13 +228,20 @@ class SystemSettings(models.Model):
         auto_now=True,
         verbose_name='Дата обновления'
     )
+    # НОВОЕ ПОЛЕ: Категория настроек
+    category = models.CharField(
+        max_length=50,
+        default='general',
+        verbose_name='Категория'
+    )
 
     class Meta:
         verbose_name = 'Настройка системы'
         verbose_name_plural = 'Настройки системы'
+        ordering = ['category', 'key']
 
     def __str__(self):
-        return self.key
+        return f"{self.category}.{self.key}"
 
     def get_typed_value(self):
         """Получение значения в правильном типе данных"""
@@ -198,6 +256,15 @@ class SystemSettings(models.Model):
             return json.loads(self.value)
         else:
             return self.value
+
+    @classmethod
+    def get_setting(cls, key, default=None):
+        """Получение значения настройки по ключу"""
+        try:
+            setting = cls.objects.get(key=key)
+            return setting.get_typed_value()
+        except cls.DoesNotExist:
+            return default
 
 
 class BackupHistory(models.Model):
@@ -256,6 +323,12 @@ class BackupHistory(models.Model):
         blank=True,
         verbose_name='Место хранения'
     )
+    # НОВОЕ ПОЛЕ: Включенные данные
+    included_data = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Включенные данные'
+    )
 
     class Meta:
         verbose_name = 'История резервного копирования'
@@ -271,12 +344,14 @@ class BackupHistory(models.Model):
             return self.end_time - self.start_time
         return None
 
-    def mark_completed(self, file_size=0, storage_location=''):
+    def mark_completed(self, file_size=0, storage_location='', included_data=None):
         """Отметить бэкап как завершенный"""
         self.status = 'success'
         self.end_time = timezone.now()
         self.backup_size = file_size
         self.storage_location = storage_location
+        if included_data:
+            self.included_data = included_data
         self.save()
 
     def mark_failed(self, error_message=''):
@@ -285,3 +360,14 @@ class BackupHistory(models.Model):
         self.end_time = timezone.now()
         self.error_message = error_message
         self.save()
+
+    def get_readable_size(self):
+        """Человеко-читаемый размер файла"""
+        if self.backup_size < 1024:
+            return f"{self.backup_size} B"
+        elif self.backup_size < 1024 * 1024:
+            return f"{self.backup_size / 1024:.2f} KB"
+        elif self.backup_size < 1024 * 1024 * 1024:
+            return f"{self.backup_size / (1024 * 1024):.2f} MB"
+        else:
+            return f"{self.backup_size / (1024 * 1024 * 1024):.2f} GB"

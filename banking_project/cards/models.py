@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinLengthValidator
+from django.apps import apps
 import datetime
 
 
@@ -26,6 +27,16 @@ class Card(models.Model):
         ('closed', 'Закрыта'),
     )
 
+    BLOCK_REASONS = (
+        ('suspicious_activity', 'Подозрительная активность'),
+        ('lost_card', 'Карта утеряна'),
+        ('stolen_card', 'Карта украдена'),
+        ('client_request', 'Запрос клиента'),
+        ('overdraft', 'Просрочка по кредиту'),
+        ('fraud', 'Мошенничество'),
+        ('other', 'Другая причина'),
+    )
+
     account = models.ForeignKey(
         'accounts.Account',
         on_delete=models.CASCADE,
@@ -47,7 +58,7 @@ class Card(models.Model):
     )
     cvv = models.CharField(
         max_length=3,
-        editable=False,  # Не храним CVV в БД - это нарушение PCI DSS
+        editable=False,
         verbose_name='CVV код'
     )
     card_type = models.CharField(
@@ -71,7 +82,7 @@ class Card(models.Model):
     daily_limit = models.DecimalField(
         max_digits=15,
         decimal_places=2,
-        default=100000.00,  # 100 000 рублей по умолчанию
+        default=100000.00,
         verbose_name='Дневной лимит'
     )
     issue_date = models.DateField(
@@ -80,7 +91,7 @@ class Card(models.Model):
     )
     pin_code = models.CharField(
         max_length=4,
-        editable=False,  # PIN не храним в открытом виде
+        editable=False,
         verbose_name='PIN код'
     )
     is_virtual = models.BooleanField(
@@ -91,6 +102,22 @@ class Card(models.Model):
         auto_now_add=True,
         verbose_name='Дата создания'
     )
+    status_changed_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Дата изменения статуса'
+    )
+    block_reason = models.CharField(
+        max_length=50,
+        choices=BLOCK_REASONS,
+        blank=True,
+        null=True,
+        verbose_name='Причина блокировки'
+    )
+    block_description = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Описание причины блокировки'
+    )
 
     class Meta:
         verbose_name = 'Банковская карта'
@@ -100,6 +127,7 @@ class Card(models.Model):
             models.Index(fields=['card_number']),
             models.Index(fields=['account', 'status']),
             models.Index(fields=['expiry_date']),
+            models.Index(fields=['status']),
         ]
 
     def __str__(self):
@@ -113,19 +141,64 @@ class Card(models.Model):
         """Возвращает маскированный номер карты"""
         return f"**** **** **** {self.card_number[-4:]}"
 
-    def block_card(self, reason='blocked'):
-        """Блокировка карты"""
+    def _log_card_status_change(self, user, old_status, new_status, reason=None, block_reason=None):
+        """Внутренний метод для логирования изменения статуса карты"""
+        try:
+            # Ленивая загрузка функции логирования
+            audit_utils = apps.get_app_config('audit')
+            log_card_status_change = getattr(audit_utils, 'log_card_status_change', None)
+
+            if log_card_status_change:
+                log_card_status_change(
+                    user=user,
+                    card=self,
+                    old_status=old_status,
+                    new_status=new_status,
+                    reason=reason,
+                    block_reason=block_reason
+                )
+        except (ImportError, LookupError, AttributeError):
+            # Если модуль аудита недоступен, просто игнорируем логирование
+            pass
+
+    def block_card(self, reason='blocked', block_reason=None, block_description=None, user=None):
+        """Блокировка карты с записью в аудит"""
         if self.status == 'active':
+            old_status = self.status
             self.status = reason
+            self.block_reason = block_reason
+            self.block_description = block_description
             self.save()
+
+            # Запись в аудит
+            if user:
+                self._log_card_status_change(
+                    user=user,
+                    old_status=old_status,
+                    new_status=self.status,
+                    reason=block_description,
+                    block_reason=block_reason
+                )
             return True
         return False
 
-    def unblock_card(self):
-        """Разблокировка карты"""
+    def unblock_card(self, user=None):
+        """Разблокировка карты с записью в аудит"""
         if self.status in ['blocked', 'lost', 'stolen']:
+            old_status = self.status
             self.status = 'active'
+            self.block_reason = None
+            self.block_description = None
             self.save()
+
+            # Запись в аудит
+            if user:
+                self._log_card_status_change(
+                    user=user,
+                    old_status=old_status,
+                    new_status=self.status,
+                    reason="Карта разблокирована"
+                )
             return True
         return False
 
@@ -142,6 +215,19 @@ class Card(models.Model):
             # Здесь можно добавить логику подсчета использованной сегодня суммы
             used_today = 0
         return max(self.daily_limit - used_today, 0)
+
+    def get_status_display_with_color(self):
+        """Возвращает статус с цветом для отображения в интерфейсе"""
+        status_colors = {
+            'active': 'success',
+            'blocked': 'danger',
+            'expired': 'warning',
+            'lost': 'danger',
+            'stolen': 'danger',
+            'closed': 'secondary'
+        }
+        color = status_colors.get(self.status, 'secondary')
+        return f'<span class="badge bg-{color}">{self.get_status_display()}</span>'
 
 
 class CardTransaction(models.Model):
@@ -218,3 +304,57 @@ class CardTransaction(models.Model):
 
     def __str__(self):
         return f"Операция {self.id} по карте {self.card.get_masked_number()}"
+
+
+class CardStatusHistory(models.Model):
+    """
+    История изменения статусов карты
+    """
+    card = models.ForeignKey(
+        Card,
+        on_delete=models.CASCADE,
+        related_name='status_history',
+        verbose_name='Карта'
+    )
+    old_status = models.CharField(
+        max_length=20,
+        choices=Card.STATUS_CHOICES,
+        verbose_name='Предыдущий статус'
+    )
+    new_status = models.CharField(
+        max_length=20,
+        choices=Card.STATUS_CHOICES,
+        verbose_name='Новый статус'
+    )
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        verbose_name='Изменено пользователем'
+    )
+    change_reason = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Причина изменения'
+    )
+    block_reason = models.CharField(
+        max_length=50,
+        choices=Card.BLOCK_REASONS,
+        blank=True,
+        null=True,
+        verbose_name='Причина блокировки'
+    )
+    changed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата и время изменения'
+    )
+
+    class Meta:
+        verbose_name = 'История статуса карты'
+        verbose_name_plural = 'История статусов карт'
+        ordering = ['-changed_at']
+        indexes = [
+            models.Index(fields=['card', 'changed_at']),
+        ]
+
+    def __str__(self):
+        return f"Изменение статуса карты {self.card.get_masked_number()}"

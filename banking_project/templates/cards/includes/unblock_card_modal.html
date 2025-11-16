@@ -1,0 +1,68 @@
+<!-- Модальное окно разблокировки карты -->
+<div class="modal fade" id="unblockCardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Разблокировка карты</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы собираетесь разблокировать карту <strong>{{ card.get_masked_number }}</strong>.</p>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Текущая информация о карте</h6>
+                        <p class="mb-1"><strong>Держатель:</strong> {{ card.cardholder_name }}</p>
+                        <p class="mb-1"><strong>Счет:</strong> {{ card.account.account_number }}</p>
+                        <p class="mb-1"><strong>Текущий статус:</strong>
+                            <span class="badge {% if card.status == 'blocked' %}bg-danger{% elif card.status == 'lost' %}bg-dark{% else %}bg-danger{% endif %}">
+                                {{ card.get_status_display }}
+                            </span>
+                        </p>
+                        {% if card.block_reason %}
+                        <p class="mb-1"><strong>Причина блокировки:</strong> {{ card.get_block_reason_display }}</p>
+                        {% endif %}
+                        {% if card.block_description %}
+                        <p class="mb-0"><strong>Описание:</strong> {{ card.block_description }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="alert alert-success">
+                    <i class="fas fa-info-circle me-2"></i>
+                    После разблокировки карта <strong>{{ card.get_masked_number }}</strong> станет доступна для использования.
+                    Клиент сможет совершать операции в рамках установленных лимитов.
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Рекомендация:</strong> Перед разблокировкой убедитесь, что причина блокировки устранена.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="post" action="{% url 'cards:card_unblock' card.id %}" id="unblockCardForm">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-unlock me-1"></i>Разблокировать карту
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const unblockCardForm = document.getElementById('unblockCardForm');
+
+    if (unblockCardForm) {
+        unblockCardForm.addEventListener('submit', function(e) {
+            // Показываем индикатор загрузки
+            const submitButton = this.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Разблокировка...';
+            submitButton.disabled = true;
+        });
+    }
+});
+</script>

@@ -2,10 +2,15 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.apps import apps
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
+from django.views.decorators.http import require_POST
+from django.utils import timezone
+from django.db import models
+from decimal import Decimal
+import datetime
 
 
 def get_user_model():
@@ -31,6 +36,11 @@ def get_account_model():
 def get_currency_model():
     """Ленивая загрузка модели Currency"""
     return apps.get_model('accounts', 'Currency')
+
+
+def get_transaction_model():
+    """Ленивая загрузка модели Transaction"""
+    return apps.get_model('transactions', 'Transaction')
 
 
 # Локальные декораторы
@@ -85,7 +95,20 @@ class DepositListView(LoginRequiredMixin, ListView):
         else:
             deposits = Deposit.objects.all()
 
-        return deposits.select_related('client', 'client__user').order_by('-created_at')
+        return deposits.select_related('client', 'client__user', 'account', 'account__currency').order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Добавляем информацию о процентах для сотрудников и админов
+        if self.request.user.role in ['employee', 'admin']:
+            deposits = context['deposits']
+            for deposit in deposits:
+                deposit.expected_interest = deposit.get_expected_interest()
+                deposit.next_accrual_date = deposit.get_next_accrual_date()
+                deposit.total_accrued_interest = deposit.get_total_accrued_interest()
+
+        return context
 
 
 class DepositDetailView(LoginRequiredMixin, DetailView):
@@ -99,8 +122,9 @@ class DepositDetailView(LoginRequiredMixin, DetailView):
 
         if self.request.user.role == 'client':
             client = get_object_or_404(Client, user=self.request.user)
-            return Deposit.objects.filter(client=client).select_related('client', 'client__user')
-        return Deposit.objects.all().select_related('client', 'client__user')
+            return Deposit.objects.filter(client=client).select_related('client', 'client__user', 'account',
+                                                                        'account__currency')
+        return Deposit.objects.all().select_related('client', 'client__user', 'account', 'account__currency')
 
     def get(self, request, *args, **kwargs):
         deposit = self.get_object()
@@ -108,6 +132,19 @@ class DepositDetailView(LoginRequiredMixin, DetailView):
             messages.error(request, 'У вас нет доступа к этому депозиту')
             return redirect('deposits:deposit_list')
         return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        deposit = context['deposit']
+
+        # Добавляем информацию о процентах
+        context['expected_interest'] = deposit.get_expected_interest()
+        context['next_accrual_date'] = deposit.get_next_accrual_date()
+        context['total_accrued_interest'] = deposit.get_total_accrued_interest()
+        context['interest_history'] = deposit.get_interest_history()[:10]  # Последние 10 начислений
+        context['can_accrue_interest'] = deposit.can_accrue_interest()
+
+        return context
 
 
 class DepositCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
@@ -138,7 +175,7 @@ class DepositUpdateView(LoginRequiredMixin, RoleRequiredMixin, UpdateView):
 
     def get_queryset(self):
         Deposit = get_deposit_model()
-        return Deposit.objects.all().select_related('client', 'client__user')
+        return Deposit.objects.all().select_related('client', 'client__user', 'account', 'account__currency')
 
     def get_form_class(self):
         from .forms import DepositForm
@@ -161,7 +198,7 @@ class DepositDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
 
     def get_queryset(self):
         Deposit = get_deposit_model()
-        return Deposit.objects.all().select_related('client', 'client__user')
+        return Deposit.objects.all().select_related('client', 'client__user', 'account', 'account__currency')
 
     def delete(self, request, *args, **kwargs):
         deposit = self.get_object()
@@ -301,3 +338,137 @@ def deposit_early_close(request, pk):
         return redirect('deposits:deposit_detail', pk=deposit.pk)
 
     return render(request, 'deposits/deposit_early_close.html', {'deposit': deposit})
+
+
+# Новые представления для начисления процентов
+@login_required
+@employee_required
+def accrue_interest_manual(request, pk):
+    """Ручное начисление процентов по депозиту"""
+    Deposit = get_deposit_model()
+
+    deposit = get_object_or_404(Deposit, pk=pk)
+
+    if not deposit.can_accrue_interest():
+        messages.error(request, 'Невозможно начислить проценты по этому депозиту')
+        return redirect('deposits:deposit_detail', pk=deposit.pk)
+
+    if request.method == 'POST':
+        try:
+            # Используем management command для начисления
+            from django.core.management import call_command
+            from django.core.management.base import CommandError
+
+            try:
+                call_command('accrue_deposits_interest', deposit_id=deposit.id)
+                messages.success(request, f'Проценты по депозиту успешно начислены')
+
+                # Обновляем объект депозита
+                deposit.refresh_from_db()
+
+            except CommandError as e:
+                messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
+
+            return redirect('deposits:deposit_detail', pk=deposit.pk)
+
+        except Exception as e:
+            messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
+
+    # Расчет ожидаемых процентов для отображения
+    expected_interest = deposit.get_expected_interest()
+
+    return render(request, 'deposits/deposit_accrue_interest.html', {
+        'deposit': deposit,
+        'expected_interest': expected_interest
+    })
+
+
+@login_required
+@employee_required
+def accrue_interest_all(request):
+    """Начисление процентов по всем депозитам"""
+    Deposit = get_deposit_model()
+
+    if request.method == 'POST':
+        try:
+            from django.core.management import call_command
+            from django.core.management.base import CommandError
+
+            try:
+                call_command('accrue_deposits_interest')
+                messages.success(request, 'Проценты по всем депозитам успешно начислены')
+            except CommandError as e:
+                messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
+
+        except Exception as e:
+            messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
+
+        return redirect('deposits:deposit_list')
+
+    # Статистика для отображения
+    active_deposits = Deposit.objects.filter(status='active').count()
+    deposits_for_accrual = Deposit.objects.filter(
+        status='active',
+        start_date__lte=timezone.now().date(),
+        end_date__gte=timezone.now().date()
+    ).count()
+
+    return render(request, 'deposits/accrue_interest_all.html', {
+        'active_deposits': active_deposits,
+        'deposits_for_accrual': deposits_for_accrual
+    })
+
+
+@require_POST
+@login_required
+@employee_required
+def get_expected_interest(request, pk):
+    """API для получения ожидаемых процентов"""
+    Deposit = get_deposit_model()
+
+    deposit = get_object_or_404(Deposit, pk=pk)
+    expected_interest = deposit.get_expected_interest()
+
+    return JsonResponse({
+        'expected_interest': float(expected_interest),
+        'currency': deposit.account.currency.code,
+        'next_accrual_date': deposit.get_next_accrual_date().isoformat() if deposit.get_next_accrual_date() else None
+    })
+
+
+@login_required
+@employee_required
+def interest_accrual_report(request):
+    """Отчет по начисленным процентам"""
+    DepositInterestPayment = apps.get_model('deposits', 'DepositInterestPayment')
+
+    # Фильтры
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    deposit_id = request.GET.get('deposit_id')
+
+    interest_payments = DepositInterestPayment.objects.select_related(
+        'deposit', 'deposit__client', 'deposit__account', 'deposit__account__currency'
+    ).all()
+
+    if date_from:
+        interest_payments = interest_payments.filter(payment_date__gte=date_from)
+    if date_to:
+        interest_payments = interest_payments.filter(payment_date__lte=date_to)
+    if deposit_id:
+        interest_payments = interest_payments.filter(deposit_id=deposit_id)
+
+    interest_payments = interest_payments.order_by('-payment_date')
+
+    # Суммарная статистика
+    total_accrued = interest_payments.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+
+    context = {
+        'interest_payments': interest_payments,
+        'total_accrued': total_accrued,
+        'date_from': date_from,
+        'date_to': date_to,
+        'deposit_id': deposit_id,
+    }
+
+    return render(request, 'deposits/interest_accrual_report.html', context)

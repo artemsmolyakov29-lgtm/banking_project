@@ -12,6 +12,25 @@
         </div>
     </div>
 
+    <!-- НОВЫЙ БЛОК: Уведомления о предстоящих платежах -->
+    {% if credit_notifications %}
+    <div class="alert alert-warning">
+        <h5><i class="fas fa-exclamation-triangle me-2"></i>Предстоящие платежи по кредитам</h5>
+        <ul class="mb-0">
+            {% for notification in credit_notifications %}
+            <li>
+                <strong>{{ notification.credit.contract_number }}</strong> -
+                Платеж {{ notification.amount }} {{ notification.currency }} до
+                {{ notification.due_date|date:"d.m.Y" }}
+                <a href="{% url 'credits:credit_payment' notification.credit.id %}" class="btn btn-sm btn-warning ms-2">
+                    Оплатить
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card bg-primary text-white">
@@ -75,6 +94,43 @@
         </div>
     </div>
 
+    <!-- НОВЫЙ БЛОК: Статистика по кредитам -->
+    {% if credit_stats %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Статистика по кредитам</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <h4>{{ credit_stats.total_credits }}</h4>
+                            <small class="text-muted">Всего кредитов</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 class="text-primary">{{ credit_stats.active_credits }}</h4>
+                            <small class="text-muted">Активных</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4 class="text-danger">{{ credit_stats.overdue_credits }}</h4>
+                            <small class="text-muted">Просроченных</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">{{ credit_stats.total_paid }}</h4>
+                            <small class="text-muted">Всего выплачено</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">{{ credit_stats.total_debt }}</h4>
+                            <small class="text-muted">Общий долг</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-md-6">
             <div class="card">
@@ -91,9 +147,9 @@
                                 <small class="text-muted">{{ transaction.description|truncatewords:3 }}</small>
                             </div>
                             <div class="text-end">
-                                <span class="fw-bold {% if transaction.transaction_type == 'DEPOSIT' or transaction.transaction_type == 'INCOME' %}text-success{% else %}text-danger{% endif %}">
-                                    {% if transaction.transaction_type == 'DEPOSIT' or transaction.transaction_type == 'INCOME' %}+{% else %}-{% endif %}
-                                    {{ transaction.amount }} {{ transaction.currency }}
+                                <span class="fw-bold {% if transaction.transaction_type == 'deposit' or transaction.transaction_type == 'interest' %}text-success{% else %}text-danger{% endif %}">
+                                    {% if transaction.transaction_type == 'deposit' or transaction.transaction_type == 'interest' %}+{% else %}-{% endif %}
+                                    {{ transaction.amount }} {{ transaction.currency.code }}
                                 </span>
                                 <br>
                                 <small class="text-muted">{{ transaction.created_at|date:"d.m.Y H:i" }}</small>
@@ -129,8 +185,8 @@
                             </a>
                         </div>
                         <div class="col-6">
-                            <a href="{% url 'transactions:transaction_create' %}" class="btn btn-outline-info w-100 mb-2">
-                                <i class="fas fa-exchange-alt"></i> Новая транзакция
+                            <a href="{% url 'transactions:transfer' %}" class="btn btn-outline-info w-100 mb-2">
+                                <i class="fas fa-exchange-alt"></i> Перевод
                             </a>
                         </div>
                         <div class="col-6">
@@ -151,6 +207,31 @@
                     </div>
                 </div>
             </div>
+
+            <!-- НОВЫЙ БЛОК: Активные кредиты -->
+            {% if active_credits %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Активные кредиты</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for credit in active_credits %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ credit.contract_number }}</h6>
+                                <small>{{ credit.remaining_balance }} {{ credit.account.currency.code }}</small>
+                            </div>
+                            <p class="mb-1 small">Следующий платеж: {{ credit.next_payment_date|date:"d.m.Y" }}</p>
+                            <a href="{% url 'credits:credit_payment' credit.id %}" class="btn btn-sm btn-outline-primary">
+                                Оплатить
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <div class="card mt-4">
                 <div class="card-header">

@@ -18,48 +18,119 @@ class CardForm(forms.ModelForm):
     class Meta:
         model = get_card_model()
         fields = [
-            'client', 'account', 'card_type', 'card_number', 'expiry_date',
-            'cvv', 'payment_system', 'status', 'daily_limit', 'monthly_limit'
+            'account', 'card_number', 'cardholder_name', 'expiry_date',
+            'card_type', 'card_system', 'status', 'daily_limit', 'is_virtual'
         ]
         widgets = {
-            'card_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'expiry_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'cvv': forms.TextInput(attrs={'class': 'form-control', 'maxlength': '3'}),
-            'daily_limit': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
-            'monthly_limit': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
+            'card_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0000 0000 0000 0000'
+            }),
+            'expiry_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control'
+            }),
+            'cardholder_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'IVAN IVANOV'
+            }),
+            'daily_limit': forms.NumberInput(attrs={
+                'step': '0.01',
+                'class': 'form-control'
+            }),
             'card_type': forms.Select(attrs={'class': 'form-select'}),
-            'payment_system': forms.Select(attrs={'class': 'form-select'}),
+            'card_system': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
-            'client': forms.Select(attrs={'class': 'form-select'}),
             'account': forms.Select(attrs={'class': 'form-select'}),
+            'is_virtual': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'card_type': 'Тип карты',
             'card_number': 'Номер карты',
+            'cardholder_name': 'Имя держателя карты',
             'expiry_date': 'Срок действия',
-            'cvv': 'CVV код',
-            'payment_system': 'Платежная система',
+            'card_system': 'Платежная система',
             'status': 'Статус',
             'daily_limit': 'Дневной лимит',
-            'monthly_limit': 'Месячный лимит',
             'account': 'Привязанный счет',
+            'is_virtual': 'Виртуальная карта',
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        Client = get_client_model()
         Account = get_account_model()
-        self.fields['client'].queryset = Client.objects.filter(is_active=True)
         self.fields['account'].queryset = Account.objects.filter(status='active')
 
     def clean_card_number(self):
         card_number = self.cleaned_data.get('card_number')
-        if card_number and len(card_number.replace(' ', '')) != 16:
-            raise forms.ValidationError("Номер карты должен содержать 16 цифр")
+        if card_number:
+            # Удаляем пробелы и проверяем длину
+            clean_number = card_number.replace(' ', '')
+            if len(clean_number) != 16 or not clean_number.isdigit():
+                raise forms.ValidationError("Номер карты должен содержать 16 цифр")
+            return clean_number
         return card_number
 
-    def clean_cvv(self):
-        cvv = self.cleaned_data.get('cvv')
-        if cvv and (len(cvv) != 3 or not cvv.isdigit()):
-            raise forms.ValidationError("CVV должен содержать 3 цифры")
-        return cvv
+    def clean_expiry_date(self):
+        expiry_date = self.cleaned_data.get('expiry_date')
+        if expiry_date:
+            from datetime import date
+            if expiry_date < date.today():
+                raise forms.ValidationError("Срок действия карты не может быть в прошлом")
+        return expiry_date
+
+    def clean_daily_limit(self):
+        daily_limit = self.cleaned_data.get('daily_limit')
+        if daily_limit and daily_limit <= 0:
+            raise forms.ValidationError("Дневной лимит должен быть положительным числом")
+        return daily_limit
+
+
+class CardBlockForm(forms.Form):
+    """
+    Форма для блокировки карты
+    """
+    block_reason = forms.ChoiceField(
+        choices=get_card_model().BLOCK_REASONS,
+        label='Причина блокировки',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    block_description = forms.CharField(
+        required=False,
+        label='Дополнительное описание',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Дополнительная информация о причине блокировки...'
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Динамически получаем выбор причин из модели
+        self.fields['block_reason'].choices = get_card_model().BLOCK_REASONS
+
+
+class CardLimitForm(forms.ModelForm):
+    """
+    Форма для изменения лимитов карты
+    """
+    class Meta:
+        model = get_card_model()
+        fields = ['daily_limit']
+        widgets = {
+            'daily_limit': forms.NumberInput(attrs={
+                'step': '0.01',
+                'class': 'form-control',
+                'min': '0'
+            })
+        }
+        labels = {
+            'daily_limit': 'Дневной лимит'
+        }
+
+    def clean_daily_limit(self):
+        daily_limit = self.cleaned_data.get('daily_limit')
+        if daily_limit and daily_limit < 0:
+            raise forms.ValidationError("Лимит не может быть отрицательным")
+        return daily_limit

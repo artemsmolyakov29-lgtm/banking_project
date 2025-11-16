@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Платеж выполнен успешно{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит {{ credit.contract_number }}</a></li>
+            <li class="breadcrumb-item active">Платеж выполнен</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="card-title mb-0">Платеж выполнен успешно!</h4>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                    </div>
+
+                    <h5>Детали операции:</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <tr>
+                                <th>Кредитный договор:</th>
+                                <td>{{ credit.contract_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>Клиент:</th>
+                                <td>{{ credit.client.get_full_name }}</td>
+                            </tr>
+                            {% if last_payment %}
+                            <tr>
+                                <th>Номер платежа:</th>
+                                <td>{{ last_payment.payment_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>Сумма платежа:</th>
+                                <td>{{ last_payment.amount }} {{ credit.account.currency.code }}</td>
+                            </tr>
+                            <tr>
+                                <th>Основной долг:</th>
+                                <td>{{ last_payment.principal_amount }} {{ credit.account.currency.code }}</td>
+                            </tr>
+                            <tr>
+                                <th>Проценты:</th>
+                                <td>{{ last_payment.interest_amount }} {{ credit.account.currency.code }}</td>
+                            </tr>
+                            {% if last_payment.penalty_amount > 0 %}
+                            <tr>
+                                <th>Штрафы:</th>
+                                <td class="text-danger">{{ last_payment.penalty_amount }} {{ credit.account.currency.code }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Дата и время:</th>
+                                <td>{{ last_payment.processed_date|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Новый остаток:</th>
+                                <td class="fw-bold">{{ credit.remaining_balance }} {{ credit.account.currency.code }}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="mt-4">
+                        <a href="{% url 'credits:credit_payment' credit.id %}" class="btn btn-primary">
+                            <i class="fas fa-credit-card me-2"></i>Новый платеж
+                        </a>
+                        <a href="{% url 'credits:payment_history' credit.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-history me-2"></i>История платежей
+                        </a>
+                        <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>К деталям кредита
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Информация о следующем платеже -->
+            {% if credit.next_payment_date %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Следующий платеж</h5>
+                </div>
+                <div class="card-body">
+                    <p>Следующий платеж запланирован на <strong>{{ credit.next_payment_date|date:"d.m.Y" }}</strong></p>
+                    <p>Ориентировочная сумма: <strong>{{ credit.calculate_next_payment }} {{ credit.account.currency.code }}</strong></p>
+
+                    <!-- Исправленный прогресс-бар без шаблонных тегов в стилях -->
+                    {% widthratio credit.total_paid credit.amount 100 as progress_percent %}
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar"
+                             data-width="{{ progress_percent }}">
+                            {{ progress_percent }}% выплачено
+                        </div>
+                    </div>
+
+                    <a href="{% url 'credits:payment_schedule' credit.id %}" class="btn btn-outline-info btn-sm">
+                        Посмотреть график платежей
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Устанавливаем ширину прогресс-бара через JavaScript
+    const progressBars = document.querySelectorAll('.progress-bar[data-width]');
+    progressBars.forEach(bar => {
+        const width = bar.getAttribute('data-width');
+        bar.style.width = width + '%';
+    });
+});
+</script>
+{% endblock %}

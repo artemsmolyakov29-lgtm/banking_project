@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator
 from django.utils import timezone
 from decimal import Decimal
 from datetime import datetime, timedelta
+from django.apps import apps
 
 
 class CreditProduct(models.Model):
@@ -282,7 +283,7 @@ class Credit(models.Model):
         if self.credit_product.payment_method == 'annuity':
             return self.calculate_annuity_payment()
         else:
-            return self.calculate_differentiated_payment()
+            return self.calculate_differentiated_payment(1)  # Первый месяц для примера
 
     def calculate_annuity_payment(self):
         """Расчет аннуитетного платежа"""
@@ -360,6 +361,127 @@ class Credit(models.Model):
             if payment['payment_date'] >= datetime.now().date():
                 return payment
         return None
+
+    # НОВЫЕ МЕТОДЫ ДЛЯ ПЛАТЕЖЕЙ
+    def calculate_next_payment(self):
+        """Расчет суммы следующего платежа"""
+        if not self.next_payment_date:
+            return Decimal('0.00')
+
+        # Определяем номер следующего платежа
+        paid_payments = self.payments.filter(status='completed').count()
+        next_payment_number = paid_payments + 1
+
+        if self.credit_product.payment_method == 'annuity':
+            return self.calculate_annuity_payment()
+        else:
+            return self.calculate_differentiated_payment(next_payment_number)
+
+    def calculate_penalty(self):
+        """Расчет штрафов за просрочку"""
+        if self.overdue_days <= 0:
+            return Decimal('0.00')
+
+        # Простой расчет: 0.1% от просроченной суммы за каждый день
+        penalty_rate = Decimal('0.001')  # 0.1% в день
+        return self.overdue_amount * penalty_rate * self.overdue_days
+
+    def make_payment(self, amount, payment_method='manual', user=None):
+        """Выполнение платежа по кредиту"""
+        from django.db import transaction as db_transaction
+
+        try:
+            with db_transaction.atomic():
+                # Получаем следующий ожидаемый платеж
+                expected_payment = self.calculate_next_payment()
+                penalty = self.calculate_penalty()
+                total_due = expected_payment + penalty
+
+                # Проверяем достаточно ли средств на счете клиента
+                client_account = self.client.accounts.filter(
+                    currency=self.account.currency,
+                    status='active'
+                ).first()
+
+                if not client_account or client_account.balance < amount:
+                    return False, "Недостаточно средств на счете"
+
+                if amount < total_due:
+                    return False, f"Недостаточная сумма платежа. Требуется: {total_due}"
+
+                # Создаем запись о платеже
+                paid_payments = self.payments.filter(status='completed').count()
+                next_payment_number = paid_payments + 1
+
+                payment = CreditPayment.objects.create(
+                    credit=self,
+                    payment_number=next_payment_number,
+                    payment_date=timezone.now().date(),
+                    due_date=self.next_payment_date or timezone.now().date(),
+                    amount=amount,
+                    principal_amount=min(expected_payment, amount - penalty),
+                    interest_amount=max(Decimal('0.00'), expected_payment - min(expected_payment, amount - penalty)),
+                    penalty_amount=penalty,
+                    status='pending',
+                    payment_method=payment_method,
+                    processed_by=user
+                )
+
+                # Создаем транзакцию
+                Transaction = apps.get_model('transactions', 'Transaction')
+                transaction = Transaction.objects.create(
+                    from_account=client_account,
+                    to_account=self.account,
+                    amount=amount,
+                    currency=self.account.currency,
+                    transaction_type='credit_payment',
+                    status='completed',
+                    description=f"Платеж по кредиту {self.contract_number}",
+                    fee=Decimal('0.00'),
+                    initiated_by=user
+                )
+
+                payment.transaction = transaction
+                payment.status = 'completed'
+                payment.processed_date = timezone.now()
+                payment.save()
+
+                # Обновляем балансы
+                client_account.balance -= amount
+                client_account.save()
+
+                # Обновляем состояние кредита
+                self.remaining_balance -= payment.principal_amount
+                self.total_paid += amount
+
+                # Обновляем дату следующего платежа
+                if self.next_payment_date:
+                    self.next_payment_date += timedelta(days=30)
+
+                # Сбрасываем просрочку если платеж покрыл ее
+                if amount >= total_due:
+                    self.overdue_amount = Decimal('0.00')
+                    self.overdue_days = 0
+                    if self.status == 'overdue':
+                        self.status = 'active'
+
+                self.save()
+
+                return True, "Платеж успешно выполнен"
+
+        except Exception as e:
+            return False, f"Ошибка при выполнении платежа: {str(e)}"
+
+    def can_make_early_repayment(self):
+        """Можно ли выполнить досрочное погашение"""
+        return (self.credit_product.early_repayment_allowed and
+                self.status == 'active' and
+                self.remaining_balance > 0)
+
+    def calculate_early_repayment(self):
+        """Расчет суммы для досрочного погашения"""
+        # Сумма остатка долга плюс проценты до конца периода
+        return self.remaining_balance + self.calculate_penalty()
 
 
 class CreditPayment(models.Model):
@@ -468,7 +590,6 @@ class CreditPayment(models.Model):
 
     def is_overdue(self):
         """Проверка, просрочен ли платеж"""
-        from django.utils import timezone
         return self.due_date < timezone.now().date() and self.status != 'completed'
 
     def process_payment(self):

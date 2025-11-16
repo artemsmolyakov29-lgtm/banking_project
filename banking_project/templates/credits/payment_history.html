@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}История платежей - {{ credit.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит {{ credit.contract_number }}</a></li>
+            <li class="breadcrumb-item active">История платежей</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">История платежей</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Статистика -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ payments_count }}</h4>
+                                    <small>Всего платежей</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ credit.payments.completed.count }}</h4>
+                                    <small>Выполнено</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ credit.payments.pending.count }}</h4>
+                                    <small>Ожидают</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ credit.payments.failed.count }}</h4>
+                                    <small>Неуспешных</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Фильтры -->
+                    <form method="get" class="mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Статус</label>
+                                <select name="status" class="form-select">
+                                    <option value="">Все статусы</option>
+                                    <option value="pending" {% if status_filter =='pending' %}selected{% endif %}>Ожидающие</option>
+                                    <option value="completed" {% if status_filter =='completed' %}selected{% endif %}>Выполненные</option>
+                                    <option value="failed" {% if status_filter =='failed' %}selected{% endif %}>Неуспешные</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">С даты</label>
+                                <input type="date" name="date_from" value="{{ date_from|default:'' }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">По дату</label>
+                                <input type="date" name="date_to" value="{{ date_to|default:'' }}" class="form-control">
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-outline-primary me-2">Применить</button>
+                                <a href="{% url 'credits:payment_history' credit.id %}" class="btn btn-outline-secondary">Сбросить</a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Таблица платежей -->
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>№ платежа</th>
+                                    <th>Дата</th>
+                                    <th>Сумма</th>
+                                    <th>Основной долг</th>
+                                    <th>Проценты</th>
+                                    <th>Штрафы</th>
+                                    <th>Способ оплаты</th>
+                                    <th>Статус</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in page_obj %}
+                                <tr>
+                                    <td>{{ payment.payment_number }}</td>
+                                    <td>{{ payment.payment_date|date:"d.m.Y" }}</td>
+                                    <td class="fw-bold">{{ payment.amount }} {{ credit.account.currency.code }}</td>
+                                    <td>{{ payment.principal_amount }} {{ credit.account.currency.code }}</td>
+                                    <td>{{ payment.interest_amount }} {{ credit.account.currency.code }}</td>
+                                    <td>
+                                        {% if payment.penalty_amount > 0 %}
+                                        <span class="text-danger">{{ payment.penalty_amount }} {{ credit.account.currency.code }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ payment.get_payment_method_display }}</td>
+                                    <td>
+                                        <span class="badge
+                                            {% if payment.status == 'completed' %}bg-success
+                                            {% elif payment.status == 'pending' %}bg-warning
+                                            {% elif payment.status == 'failed' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ payment.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if payment.transaction %}
+                                        <a href="{% url 'transactions:transaction_detail' payment.transaction.id %}"
+                                           class="btn btn-sm btn-outline-info" title="Детали транзакции">
+                                            <i class="fas fa-info-circle"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Пагинация -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Назад</a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Вперед</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">Платежи по этому кредиту отсутствуют</p>
+                        <a href="{% url 'credits:credit_payment' credit.id %}" class="btn btn-primary">
+                            Внести первый платеж
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,85 @@
+<!-- Модальное окно блокировки карты -->
+<div class="modal fade" id="blockCardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Блокировка карты</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'cards:card_block' card.id %}" id="blockCardForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p>Вы собираетесь заблокировать карту <strong>{{ card.get_masked_number }}</strong>.</p>
+
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Информация о карте</h6>
+                            <p class="mb-1"><strong>Держатель:</strong> {{ card.cardholder_name }}</p>
+                            <p class="mb-1"><strong>Счет:</strong> {{ card.account.account_number }}</p>
+                            <p class="mb-0"><strong>Тип:</strong> {{ card.get_card_type_display }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="block_reason" class="form-label">Причина блокировки <span class="text-danger">*</span></label>
+                        <select class="form-select" id="block_reason" name="block_reason" required>
+                            <option value="">Выберите причину блокировки...</option>
+                            <option value="suspicious_activity">Подозрительная активность</option>
+                            <option value="lost_card">Карта утеряна</option>
+                            <option value="stolen_card">Карта украдена</option>
+                            <option value="client_request">Запрос клиента</option>
+                            <option value="overdraft">Просрочка по кредиту</option>
+                            <option value="fraud">Мошенничество</option>
+                            <option value="other">Другая причина</option>
+                        </select>
+                        <div class="form-text">Выберите наиболее подходящую причину блокировки карты.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="block_description" class="form-label">Дополнительное описание</label>
+                        <textarea class="form-control" id="block_description"
+                                  name="block_description" rows="4"
+                                  placeholder="Подробное описание причины блокировки, обстоятельства, дополнительная информация..."></textarea>
+                        <div class="form-text">Это поле не является обязательным, но рекомендуется для ведения истории.</div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Внимание!</strong> После блокировки карта станет недоступна для любых операций.
+                        Разблокировать карту можно будет в любое время.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-lock me-1"></i>Заблокировать карту
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const blockCardForm = document.getElementById('blockCardForm');
+
+    if (blockCardForm) {
+        blockCardForm.addEventListener('submit', function(e) {
+            const blockReason = document.getElementById('block_reason');
+
+            if (!blockReason.value) {
+                e.preventDefault();
+                alert('Пожалуйста, выберите причину блокировки.');
+                blockReason.focus();
+                return false;
+            }
+
+            // Показываем индикатор загрузки
+            const submitButton = this.querySelector('button[type="submit"]');
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Блокировка...';
+            submitButton.disabled = true;
+        });
+    }
+});
+</script>

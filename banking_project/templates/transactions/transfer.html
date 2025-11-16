@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Перевод между счетами{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Перевод между счетами</h4>
+            </div>
+            <div class="card-body">
+                {% if user_accounts %}
+                <div class="alert alert-info">
+                    <h6>Ваши счета:</h6>
+                    <ul class="mb-0">
+                        {% for account in user_accounts %}
+                        <li>{{ account.account_number }} - {{ account.balance }} {{ account.currency.code }} ({{ account.get_status_display }})</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post" class="transfer-form">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Номер счета отправителя</label>
+                                <input type="text"
+                                       name="from_account_number"
+                                       class="form-control"
+                                       value="{{ form.from_account_number.value|default:'' }}"
+                                       required>
+                                {% if form.from_account_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.from_account_number.errors %}
+                                    {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Номер счета получателя</label>
+                                <input type="text"
+                                       name="to_account_number"
+                                       class="form-control"
+                                       value="{{ form.to_account_number.value|default:'' }}"
+                                       required>
+                                {% if form.to_account_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.to_account_number.errors %}
+                                    {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Сумма перевода</label>
+                        <input type="number"
+                               name="amount"
+                               class="form-control"
+                               step="0.01"
+                               min="0.01"
+                               value="{{ form.amount.value|default:'' }}"
+                               required>
+                        {% if form.amount.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.amount.errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Комиссия: 1% от суммы (мин. 10, макс. 1000)
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Описание перевода</label>
+                        <textarea name="description"
+                                  class="form-control"
+                                  rows="3">{{ form.description.value|default:'' }}</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Выполнить перевод
+                        </button>
+                        <a href="{% url 'users:dashboard' %}" class="btn btn-secondary">Отмена</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelector('.transfer-form').addEventListener('submit', function(e) {
+    const amountInput = this.querySelector('input[name="amount"]');
+    const amount = parseFloat(amountInput.value);
+    if (amount && amount > 0) {
+        const fee = Math.max(10, Math.min(amount * 0.01, 1000));
+        const total = amount + fee;
+        if (!confirm(`Сумма перевода: ${amount}\nКомиссия: ${fee.toFixed(2)}\nИтого к списанию: ${total.toFixed(2)}\n\nПродолжить?`)) {
+            e.preventDefault();
+        }
+    }
+});
+</script>
+{% endblock %}

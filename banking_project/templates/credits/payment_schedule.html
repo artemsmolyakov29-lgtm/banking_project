@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block title %}График платежей - {{ credit.contract_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'credits:credit_detail' credit.id %}">Кредит {{ credit.contract_number }}</a></li>
+            <li class="breadcrumb-item active">График платежей</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="card-title mb-0">График платежей</h4>
+                    <div>
+                        <a href="{% url 'credits:credit_payment' credit.id %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-credit-card me-1"></i>Внести платеж
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Фильтры -->
+                    <form method="get" class="mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">С даты</label>
+                                <input type="date" name="date_from" value="{{ form.date_from.value|default:'' }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">По дату</label>
+                                <input type="date" name="date_to" value="{{ form.date_to.value|default:'' }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Статус</label>
+                                <select name="status" class="form-select">
+                                    <option value="">Все статусы</option>
+                                    <option value="pending" {% if form.status.value =='pending' %}selected{% endif %}>Ожидающие</option>
+                                    <option value="completed" {% if form.status.value =='completed' %}selected{% endif %}>Выполненные</option>
+                                    <option value="failed" {% if form.status.value =='failed' %}selected{% endif %}>Неуспешные</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-outline-primary me-2">Применить</button>
+                                <a href="{% url 'credits:payment_schedule' credit.id %}" class="btn btn-outline-secondary">Сбросить</a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- График платежей -->
+                    {% if schedule %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>№</th>
+                                    <th>Дата платежа</th>
+                                    <th>Основной долг</th>
+                                    <th>Проценты</th>
+                                    <th>Всего</th>
+                                    <th>Остаток долга</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in schedule %}
+                                <tr class="{% if payment.payment_date < today %}table-warning{% endif %}">
+                                    <td>{{ payment.payment_number }}</td>
+                                    <td>{{ payment.payment_date|date:"d.m.Y" }}</td>
+                                    <td>{{ payment.principal_amount }} {{ credit.account.currency.code }}</td>
+                                    <td>{{ payment.interest_amount }} {{ credit.account.currency.code }}</td>
+                                    <td class="fw-bold">{{ payment.total_payment }} {{ credit.account.currency.code }}</td>
+                                    <td>{{ payment.remaining_balance }} {{ credit.account.currency.code }}</td>
+                                    <td>
+                                        {% if payment.payment_date < today %}
+                                        <span class="badge bg-warning">Просрочен</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Ожидается</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Сводная информация -->
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h5>{{ total_schedule|length }}</h5>
+                                    <small class="text-muted">Всего платежей</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h5 class="text-success">{{ credit.total_paid }} {{ credit.account.currency.code }}</h5>
+                                    <small class="text-muted">Выплачено</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h5 class="text-warning">{{ credit.remaining_balance }} {{ credit.account.currency.code }}</h5>
+                                    <small class="text-muted">Остаток долга</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">График платежей недоступен</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

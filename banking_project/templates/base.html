@@ -27,6 +27,9 @@
         .stat-card:hover {
             transform: translateY(-2px);
         }
+        .credit-notification {
+            border-left: 4px solid #ffc107;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -45,7 +48,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
-                        {% if user.role == 'ADMIN' or user.role == 'EMPLOYEE' %}
+                        {% if user.role == 'admin' or user.role == 'employee' %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'users:dashboard' %}">
                                 <i class="fas fa-tachometer-alt me-1"></i>Дашборд
@@ -77,8 +80,12 @@
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
-                                <li><a class="dropdown-item" href="{% url 'credits:credit_apply' %}">Оформить кредит</a></li>
+                                <li><a class="dropdown-item" href="{% url 'credits:credit_create' %}">Оформить кредит</a></li>
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_products' %}">Кредитные продукты</a></li>
+                                <!-- НОВЫЕ ПУНКТЫ МЕНЮ ДЛЯ КРЕДИТОВ -->
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-history me-2"></i>Платежи по кредитам</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-calendar-alt me-2"></i>Графики платежей</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -90,10 +97,15 @@
                                 <li><a class="dropdown-item" href="{% url 'deposits:deposit_open' %}">Открыть депозит</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'transactions:transaction_list' %}">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                                 <i class="fas fa-exchange-alt me-1"></i>Транзакции
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'transactions:transaction_list' %}">Все транзакции</a></li>
+                                <li><a class="dropdown-item" href="{% url 'transactions:transfer' %}">Перевод между счетами</a></li>
+                                <li><a class="dropdown-item" href="{% url 'transactions:history' %}">История операций</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
@@ -108,9 +120,9 @@
                         </li>
                         {% endif %}
 
-                        {% if user.role == 'CLIENT' %}
+                        {% if user.role == 'client' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'users:dashboard_client' %}">
+                            <a class="nav-link" href="{% url 'users:dashboard' %}">
                                 <i class="fas fa-tachometer-alt me-1"></i>Мой кабинет
                             </a>
                         </li>
@@ -119,15 +131,28 @@
                                 <i class="fas fa-wallet me-1"></i>Мои счета
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'transactions:transaction_list' %}">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                                 <i class="fas fa-exchange-alt me-1"></i>Операции
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'transactions:transaction_list' %}">Мои транзакции</a></li>
+                                <li><a class="dropdown-item" href="{% url 'transactions:transfer' %}">Переводы</a></li>
+                                <li><a class="dropdown-item" href="{% url 'transactions:history' %}">История</a></li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'credits:credit_list' %}">
-                                <i class="fas fa-credit-card me-1"></i>Мои кредиты
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                <i class="fas fa-credit-card me-1"></i>Кредиты
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'credits:credit_list' %}">Мои кредиты</a></li>
+                                <li><a class="dropdown-item" href="{% url 'credits:credit_products' %}">Кредитные продукты</a></li>
+                                <!-- НОВЫЕ ПУНКТЫ МЕНЮ ДЛЯ КЛИЕНТОВ -->
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-credit-card me-2"></i>Оплата кредитов</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-calendar me-2"></i>Мои платежи</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'deposits:deposit_list' %}">
@@ -136,7 +161,7 @@
                         </li>
                         {% endif %}
 
-                        {% if user.role == 'ADMIN' %}
+                        {% if user.role == 'admin' %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                                 <i class="fas fa-cogs me-1"></i>Администрирование

@@ -37,6 +37,74 @@
     </div>
     {% endif %}
 
+    <!-- Статистика карт -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-primary text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Всего карт</div>
+                            <div class="h5 mb-0">{{ cards.paginator.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-credit-card fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-success text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Активные</div>
+                            <div class="h5 mb-0">
+                                {% with active_cards=cards|dictsort:"status" %}
+                                    {{ cards|length|default:0 }}
+                                {% endwith %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-danger text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Заблокированные</div>
+                            <div class="h5 mb-0">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-lock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-warning text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-1">Просроченные</div>
+                            <div class="h5 mb-0">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h5 class="mb-0">
@@ -51,6 +119,7 @@
                         <tr>
                             <th>Номер карты</th>
                             <th>Держатель</th>
+                            <th>Счет</th>
                             <th>Тип</th>
                             <th>Платежная система</th>
                             <th>Срок действия</th>
@@ -62,22 +131,33 @@
                         {% for card in cards %}
                         <tr>
                             <td>
-                                <strong>{{ card.card_number|default:"**** **** **** ****" }}</strong>
+                                <strong>{{ card.get_masked_number }}</strong>
                                 {% if card.is_virtual %}
-                                <span class="badge bg-info ms-1">Виртуальная</span>
+                                <span class="badge bg-info ms-1" title="Виртуальная карта">V</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {{ card.account.client.full_name|default:card.client.full_name }}
+                                {{ card.cardholder_name }}
                                 {% if user.role in 'employee,admin' %}
-                                <br><small class="text-muted">ID: {{ card.account.client.id|default:card.client.id }}</small>
+                                <br><small class="text-muted">Клиент: {{ card.account.client.full_name }}</small>
                                 {% endif %}
+                            </td>
+                            <td>
+                                {{ card.account.account_number }}
+                                <br><small class="text-muted">{{ card.account.currency.code }}</small>
                             </td>
                             <td>
                                 <span class="badge bg-secondary">{{ card.get_card_type_display }}</span>
                             </td>
-                            <td>{{ card.get_payment_system_display }}</td>
-                            <td>{{ card.expiry_date|date:"m/Y"|default:"Не указан" }}</td>
+                            <td>
+                                <span class="badge bg-primary">{{ card.get_card_system_display }}</span>
+                            </td>
+                            <td>
+                                {{ card.expiry_date|date:"m/Y" }}
+                                {% if card.is_expired %}
+                                <br><small class="text-danger">Просрочена</small>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if card.status == 'active' %}
                                 <span class="badge bg-success">Активна</span>
@@ -85,6 +165,10 @@
                                 <span class="badge bg-danger">Заблокирована</span>
                                 {% elif card.status == 'expired' %}
                                 <span class="badge bg-warning">Просрочена</span>
+                                {% elif card.status == 'lost' %}
+                                <span class="badge bg-dark">Утеряна</span>
+                                {% elif card.status == 'stolen' %}
+                                <span class="badge bg-danger">Украдена</span>
                                 {% else %}
                                 <span class="badge bg-secondary">{{ card.get_status_display }}</span>
                                 {% endif %}
@@ -99,15 +183,24 @@
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     {% endif %}
+
+                                    <!-- Кнопки блокировки/разблокировки -->
                                     {% if card.status == 'active' %}
-                                    <a href="{% url 'cards:card_block' card.id %}" class="btn btn-outline-warning" title="Заблокировать">
+                                    <button type="button" class="btn btn-outline-warning"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#blockCardModal{{ card.id }}"
+                                            title="Заблокировать">
                                         <i class="fas fa-lock"></i>
-                                    </a>
-                                    {% elif card.status == 'blocked' %}
-                                    <a href="{% url 'cards:card_unblock' card.id %}" class="btn btn-outline-success" title="Разблокировать">
+                                    </button>
+                                    {% elif card.status in 'blocked,lost,stolen' %}
+                                    <button type="button" class="btn btn-outline-success"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#unblockCardModal{{ card.id }}"
+                                            title="Разблокировать">
                                         <i class="fas fa-unlock"></i>
-                                    </a>
+                                    </button>
                                     {% endif %}
+
                                     {% if user.role == 'admin' %}
                                     <button type="button" class="btn btn-outline-danger"
                                             data-bs-toggle="modal"
@@ -117,6 +210,85 @@
                                     </button>
                                     {% endif %}
                                 </div>
+
+                                <!-- Модальное окно блокировки карты -->
+                                {% if card.status == 'active' %}
+                                <div class="modal fade" id="blockCardModal{{ card.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Блокировка карты</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form method="post" action="{% url 'cards:card_block' card.id %}">
+                                                {% csrf_token %}
+                                                <div class="modal-body">
+                                                    <p>Вы собираетесь заблокировать карту <strong>{{ card.get_masked_number }}</strong>.</p>
+                                                    <p><strong>Держатель:</strong> {{ card.cardholder_name }}</p>
+
+                                                    <div class="mb-3">
+                                                        <label for="block_reason{{ card.id }}" class="form-label">Причина блокировки:</label>
+                                                        <select class="form-select" id="block_reason{{ card.id }}" name="block_reason" required>
+                                                            <option value="">Выберите причину...</option>
+                                                            <option value="suspicious_activity">Подозрительная активность</option>
+                                                            <option value="lost_card">Карта утеряна</option>
+                                                            <option value="stolen_card">Карта украдена</option>
+                                                            <option value="client_request">Запрос клиента</option>
+                                                            <option value="overdraft">Просрочка по кредиту</option>
+                                                            <option value="fraud">Мошенничество</option>
+                                                            <option value="other">Другая причина</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label for="block_description{{ card.id }}" class="form-label">Дополнительное описание:</label>
+                                                        <textarea class="form-control" id="block_description{{ card.id }}"
+                                                                  name="block_description" rows="3"
+                                                                  placeholder="Дополнительная информация о причине блокировки..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                    <button type="submit" class="btn btn-warning">Заблокировать карту</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Модальное окно разблокировки карты -->
+                                {% if card.status in 'blocked,lost,stolen' %}
+                                <div class="modal fade" id="unblockCardModal{{ card.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Разблокировка карты</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>Вы собираетесь разблокировать карту <strong>{{ card.get_masked_number }}</strong>.</p>
+                                                <p><strong>Держатель:</strong> {{ card.cardholder_name }}</p>
+                                                <p><strong>Текущий статус:</strong> {{ card.get_status_display }}</p>
+                                                {% if card.block_reason %}
+                                                <p><strong>Причина блокировки:</strong> {{ card.get_block_reason_display }}</p>
+                                                {% endif %}
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    После разблокировки карта станет доступна для использования.
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                <form method="post" action="{% url 'cards:card_unblock' card.id %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-success">Разблокировать карту</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
 
                                 <!-- Модальное окно подтверждения удаления -->
                                 {% if user.role == 'admin' %}
@@ -128,7 +300,9 @@
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body">
-                                                <p>Вы уверены, что хотите удалить карту <strong>{{ card.card_number|default:"**** **** **** ****" }}</strong>?</p>
+                                                <p>Вы уверены, что хотите удалить карту <strong>{{ card.get_masked_number }}</strong>?</p>
+                                                <p><strong>Держатель:</strong> {{ card.cardholder_name }}</p>
+                                                <p><strong>Счет:</strong> {{ card.account.account_number }}</p>
                                                 <p class="text-danger">Это действие нельзя отменить.</p>
                                             </div>
                                             <div class="modal-footer">

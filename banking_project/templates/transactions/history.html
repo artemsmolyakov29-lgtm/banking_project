@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}История транзакций{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="card-title mb-0">История транзакций</h4>
+                <a href="{% url 'transactions:transfer' %}" class="btn btn-primary btn-sm">Новый перевод</a>
+            </div>
+            <div class="card-body">
+
+                <!-- Фильтры -->
+                <form method="get" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <select name="type" class="form-control">
+                                <option value="">Все типы</option>
+                                {% for type_value, type_name in transaction_types %}
+                                <option value="{{ type_value }}" {% if transaction_type == type_value %}selected{% endif %}>
+                                    {{ type_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="date" name="date_from" value="{{ date_from }}" class="form-control" placeholder="С даты">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="date" name="date_to" value="{{ date_to }}" class="form-control" placeholder="По дату">
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-outline-primary">Фильтровать</button>
+                            <a href="{% url 'transactions:history' %}" class="btn btn-outline-secondary">Сбросить</a>
+                        </div>
+                    </div>
+                </form>
+
+                {% if page_obj %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Тип операции</th>
+                                <th>Счет отправителя</th>
+                                <th>Счет получателя</th>
+                                <th>Сумма</th>
+                                <th>Комиссия</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in page_obj %}
+                            <tr>
+                                <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
+                                <td>
+                                    <span class="badge badge-info">{{ transaction.get_transaction_type_display }}</span>
+                                </td>
+                                <td>
+                                    {% if transaction.from_account %}
+                                    {{ transaction.from_account.account_number }}
+                                    {% else %}
+                                    <em>Система</em>
+                                    {% endif %}
+                                </td>
+                                <td>{{ transaction.to_account.account_number }}</td>
+                                <td>{{ transaction.amount }} {{ transaction.currency.code }}</td>
+                                <td>{{ transaction.fee }} {{ transaction.currency.code }}</td>
+                                <td>
+                                    <span class="badge
+                                        {% if transaction.status == 'completed' %}badge-success
+                                        {% elif transaction.status == 'pending' %}badge-warning
+                                        {% elif transaction.status == 'failed' %}badge-danger
+                                        {% else %}badge-secondary{% endif %}">
+                                        {{ transaction.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{% url 'transactions:transaction_detail' transaction.id %}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        Детали
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Пагинация -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if transaction_type %}&type={{ transaction_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Назад</a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if transaction_type %}&type={{ transaction_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if transaction_type %}&type={{ transaction_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Вперед</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">У вас пока нет транзакций</p>
+                    <a href="{% url 'transactions:transfer' %}" class="btn btn-primary">Создать первую транзакцию</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

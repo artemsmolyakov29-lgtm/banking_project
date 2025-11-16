@@ -2,11 +2,11 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.apps import apps
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-
+from django.views.decorators.http import require_POST
 
 # Ленивая загрузка моделей
 def get_user_model():
@@ -32,6 +32,11 @@ def get_card_transaction_model():
 def get_account_model():
     """Ленивая загрузка модели Account"""
     return apps.get_model('accounts', 'Account')
+
+
+def get_card_status_history_model():
+    """Ленивая загрузка модели CardStatusHistory"""
+    return apps.get_model('cards', 'CardStatusHistory')
 
 
 # Локальные декораторы
@@ -107,6 +112,14 @@ class CardDetailView(LoginRequiredMixin, DetailView):
             return Card.objects.filter(account__in=accounts).select_related('account', 'account__client',
                                                                             'account__client__user')
         return Card.objects.all().select_related('account', 'account__client', 'account__client__user')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        CardStatusHistory = get_card_status_history_model()
+
+        # Добавляем историю статусов в контекст
+        context['status_history'] = self.object.status_history.all().select_related('changed_by')[:10]
+        return context
 
     def get(self, request, *args, **kwargs):
         card = self.get_object()
@@ -235,6 +248,7 @@ def card_detail_old(request, pk):
 
 
 @login_required
+@require_POST
 def card_block(request, pk):
     """Блокировка карты"""
     Card = get_card_model()
@@ -247,18 +261,34 @@ def card_block(request, pk):
         messages.error(request, 'У вас нет доступа к этой карте')
         return redirect('cards:card_list')
 
-    if request.method == 'POST':
-        reason = request.POST.get('reason', 'blocked')
-        if card.block_card(reason):
-            messages.success(request, 'Карта успешно заблокирована')
-        else:
-            messages.error(request, 'Не удалось заблокировать карту')
-        return redirect('cards:card_detail', pk=card.pk)
+    block_reason = request.POST.get('block_reason')
+    block_description = request.POST.get('block_description', '')
 
-    return render(request, 'cards/card_confirm_block.html', {'card': card})
+    if card.block_card(reason='blocked', block_reason=block_reason,
+                       block_description=block_description, user=request.user):
+        messages.success(request, 'Карта успешно заблокирована')
+
+        # Если это AJAX-запрос, возвращаем JSON
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Карта успешно заблокирована',
+                'status': card.get_status_display(),
+                'status_color': 'danger'
+            })
+    else:
+        messages.error(request, 'Не удалось заблокировать карту')
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': 'Не удалось заблокировать карту'
+            }, status=400)
+
+    return redirect('cards:card_detail', pk=card.pk)
 
 
 @login_required
+@require_POST
 def card_unblock(request, pk):
     """Разблокировка карты"""
     Card = get_card_model()
@@ -271,12 +301,55 @@ def card_unblock(request, pk):
         messages.error(request, 'У вас нет доступа к этой карте')
         return redirect('cards:card_list')
 
-    if request.method == 'POST':
-        if card.unblock_card():
-            messages.success(request, 'Карта успешно разблокирована')
-        else:
-            messages.error(request, 'Не удалось разблокировать карту')
-        return redirect('cards:card_detail', pk=card.pk)
+    if card.unblock_card(user=request.user):
+        messages.success(request, 'Карта успешно разблокирована')
+
+        # Если это AJAX-запрос, возвращаем JSON
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Карта успешно разблокирована',
+                'status': card.get_status_display(),
+                'status_color': 'success'
+            })
+    else:
+        messages.error(request, 'Не удалось разблокировать карту')
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': 'Не удалось разблокировать карту'
+            }, status=400)
+
+    return redirect('cards:card_detail', pk=card.pk)
+
+
+@login_required
+def card_block_confirm(request, pk):
+    """Подтверждение блокировки карты"""
+    Card = get_card_model()
+    card = get_object_or_404(Card, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and card.account.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к этой карте')
+        return redirect('cards:card_list')
+
+    return render(request, 'cards/card_confirm_block.html', {
+        'card': card,
+        'block_reasons': Card.BLOCK_REASONS
+    })
+
+
+@login_required
+def card_unblock_confirm(request, pk):
+    """Подтверждение разблокировки карты"""
+    Card = get_card_model()
+    card = get_object_or_404(Card, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and card.account.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к этой карте')
+        return redirect('cards:card_list')
 
     return render(request, 'cards/card_confirm_unblock.html', {'card': card})
 
@@ -339,3 +412,24 @@ def card_reissue(request, pk):
         return redirect('cards:card_detail', pk=card.pk)
 
     return render(request, 'cards/card_reissue.html', {'card': card})
+
+
+@login_required
+def card_status_history(request, pk):
+    """История изменения статусов карты"""
+    Card = get_card_model()
+    CardStatusHistory = get_card_status_history_model()
+
+    card = get_object_or_404(Card, pk=pk)
+
+    # Проверка прав доступа
+    if request.user.role == 'client' and card.account.client.user != request.user:
+        messages.error(request, 'У вас нет доступа к истории этой карты')
+        return redirect('cards:card_list')
+
+    status_history = card.status_history.all().select_related('changed_by')
+
+    return render(request, 'cards/card_status_history.html', {
+        'card': card,
+        'status_history': status_history
+    })

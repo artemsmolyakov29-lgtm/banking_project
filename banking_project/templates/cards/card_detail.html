@@ -1,92 +1,236 @@
 {% extends 'base.html' %}
 
-{% block title %}Карта #{{ card.id }}{% endblock %}
+{% block title %}Карта {{ card.get_masked_number }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'cards:card_list' %}">Все карты</a></li>
-            <li class="breadcrumb-item active">Карта #{{ card.id }}</li>
+            <li class="breadcrumb-item active">Карта {{ card.get_masked_number }}</li>
         </ol>
     </nav>
 
+    <!-- Сообщения -->
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-lg-8">
+            <!-- Основная информация о карте -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Информация о карте</h5>
+                    <span class="badge {% if card.status == 'active' %}bg-success{% elif card.status == 'blocked' %}bg-danger{% elif card.status == 'expired' %}bg-warning{% else %}bg-secondary{% endif %}">
+                        {{ card.get_status_display }}
+                    </span>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>Номер карты:</strong><br>**** **** **** {{ card.last_four_digits }}</p>
-                            <p><strong>Держатель:</strong><br>{{ card.account.client.get_full_name }}</p>
+                            <p><strong>Номер карты:</strong><br>{{ card.get_masked_number }}</p>
+                            <p><strong>Держатель карты:</strong><br>{{ card.cardholder_name }}</p>
                             <p><strong>Счет:</strong><br>{{ card.account.account_number }}</p>
+                            <p><strong>Клиент:</strong><br>{{ card.account.client.full_name }}</p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>Тип карты:</strong><br>{{ card.get_card_type_display }}</p>
+                            <p><strong>Платежная система:</strong><br>{{ card.get_card_system_display }}</p>
                             <p><strong>Дата выпуска:</strong><br>{{ card.issue_date|date:"d.m.Y" }}</p>
                             <p><strong>Срок действия:</strong><br>{{ card.expiry_date|date:"m/Y" }}</p>
+                            {% if card.is_virtual %}
+                            <p><strong>Тип:</strong><br><span class="badge bg-info">Виртуальная карта</span></p>
+                            {% endif %}
                         </div>
                     </div>
+
+                    <!-- Дополнительная информация при блокировке -->
+                    {% if card.status == 'blocked' and card.block_reason %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <h6 class="alert-heading">Информация о блокировке</h6>
+                                <p class="mb-1"><strong>Причина:</strong> {{ card.get_block_reason_display }}</p>
+                                {% if card.block_description %}
+                                <p class="mb-1"><strong>Описание:</strong> {{ card.block_description }}</p>
+                                {% endif %}
+                                <p class="mb-0"><strong>Дата изменения статуса:</strong> {{ card.status_changed_at|date:"d.m.Y H:i" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
+            <!-- Лимиты карты -->
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Лимиты карты</h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <div class="border rounded p-3">
                                 <h6>Дневной лимит</h6>
-                                <h4 class="text-primary">{{ card.daily_limit }} {{ card.currency }}</h4>
+                                <h4 class="text-primary">{{ card.daily_limit }} {{ card.account.currency.code }}</h4>
+                                {% if card.status == 'active' %}
+                                <small class="text-muted">Осталось сегодня: {{ card.get_remaining_daily_limit }} {{ card.account.currency.code }}</small>
+                                {% endif %}
                             </div>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <div class="border rounded p-3">
-                                <h6>Месячный лимит</h6>
-                                <h4 class="text-primary">{{ card.monthly_limit }} {{ card.currency }}</h4>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="border rounded p-3">
-                                <h6>Лимит операции</h6>
-                                <h4 class="text-primary">{{ card.transaction_limit }} {{ card.currency }}</h4>
+                                <h6>Статус карты</h6>
+                                {% if card.can_be_used %}
+                                <h4 class="text-success">Доступна для использования</h4>
+                                {% else %}
+                                <h4 class="text-danger">Недоступна</h4>
+                                {% endif %}
+                                <small class="text-muted">
+                                    {% if card.is_expired %}
+                                    Срок действия истек
+                                    {% elif card.status != 'active' %}
+                                    Карта {{ card.get_status_display|lower }}
+                                    {% else %}
+                                    Карта активна
+                                    {% endif %}
+                                </small>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- История статусов -->
+            {% if status_history %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">История изменений статуса</h5>
+                    <a href="{% url 'cards:card_status_history' card.id %}" class="btn btn-sm btn-outline-primary">
+                        Вся история
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Предыдущий статус</th>
+                                    <th>Новый статус</th>
+                                    <th>Причина</th>
+                                    <th>Пользователь</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for history in status_history %}
+                                <tr>
+                                    <td>{{ history.changed_at|date:"d.m.Y H:i" }}</td>
+                                    <td>
+                                        <span class="badge {% if history.old_status == 'active' %}bg-success{% elif history.old_status == 'blocked' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                            {{ history.get_old_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if history.new_status == 'active' %}bg-success{% elif history.new_status == 'blocked' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                            {{ history.get_new_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if history.change_reason %}
+                                        {{ history.change_reason|truncatewords:5 }}
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ history.changed_by.get_full_name|default:history.changed_by.username }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <div class="col-lg-4">
+            <!-- Действия с картой -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">Действия</h5>
+                    <h5 class="mb-0">Действия с картой</h5>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        {% if card.status == 'ACTIVE' %}
-                        <a href="{% url 'cards:card_confirm_block' card.id %}" class="btn btn-warning">
-                            Заблокировать карту
-                        </a>
-                        {% elif card.status == 'BLOCKED' %}
-                        <a href="{% url 'cards:card_confirm_unblock' card.id %}" class="btn btn-success">
-                            Разблокировать карту
+                        {% if card.status == 'active' %}
+                        <!-- Кнопка блокировки -->
+                        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#blockCardModal">
+                            <i class="fas fa-lock me-1"></i>Заблокировать карту
+                        </button>
+                        {% elif card.status in 'blocked,lost,stolen' %}
+                        <!-- Кнопка разблокировки -->
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#unblockCardModal">
+                            <i class="fas fa-unlock me-1"></i>Разблокировать карту
+                        </button>
+                        {% endif %}
+
+                        <!-- Другие действия -->
+                        {% if user.role in 'employee,admin' and card.status == 'active' %}
+                        <a href="{% url 'cards:card_limits' card.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-sliders-h me-1"></i>Изменить лимиты
                         </a>
                         {% endif %}
 
-                        <a href="{% url 'cards:card_limits' card.id %}" class="btn btn-outline-primary">
-                            Изменить лимиты
-                        </a>
+                        {% if user.role in 'employee,admin' %}
                         <a href="{% url 'cards:card_reissue' card.id %}" class="btn btn-outline-info">
-                            Перевыпустить карту
+                            <i class="fas fa-redo me-1"></i>Перевыпустить карту
                         </a>
+                        {% endif %}
+
                         <a href="{% url 'cards:card_transactions' card.id %}" class="btn btn-outline-dark">
-                            История операций
+                            <i class="fas fa-history me-1"></i>История операций
+                        </a>
+
+                        {% if user.role in 'employee,admin' %}
+                        <a href="{% url 'cards:card_update' card.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-edit me-1"></i>Редактировать карту
+                        </a>
+                        {% endif %}
+
+                        {% if user.role == 'admin' %}
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCardModal">
+                            <i class="fas fa-trash me-1"></i>Удалить карту
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Информация о счете -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о счете</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Номер счета:</strong><br>{{ card.account.account_number }}</p>
+                    <p><strong>Баланс:</strong><br>{{ card.account.balance }} {{ card.account.currency.code }}</p>
+                    <p><strong>Тип счета:</strong><br>{{ card.account.get_account_type_display }}</p>
+                    <p><strong>Статус счета:</strong><br>
+                        <span class="badge {% if card.account.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">
+                            {{ card.account.get_status_display }}
+                        </span>
+                    </p>
+                    <div class="d-grid">
+                        <a href="{% url 'accounts:account_detail' card.account.id %}" class="btn btn-sm btn-outline-primary">
+                            Перейти к счету
                         </a>
                     </div>
                 </div>
@@ -94,4 +238,42 @@
         </div>
     </div>
 </div>
+
+<!-- Модальное окно блокировки карты -->
+{% if card.status == 'active' %}
+{% include 'cards/includes/block_card_modal.html' with card=card %}
+{% endif %}
+
+<!-- Модальное окно разблокировки карты -->
+{% if card.status in 'blocked,lost,stolen' %}
+{% include 'cards/includes/unblock_card_modal.html' with card=card %}
+{% endif %}
+
+<!-- Модальное окно удаления карты -->
+{% if user.role == 'admin' %}
+<div class="modal fade" id="deleteCardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить карту <strong>{{ card.get_masked_number }}</strong>?</p>
+                <p class="text-danger"><strong>Внимание:</strong> Это действие нельзя отменить. Все данные карты будут удалены безвозвратно.</p>
+                <p><strong>Держатель:</strong> {{ card.cardholder_name }}</p>
+                <p><strong>Счет:</strong> {{ card.account.account_number }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="post" action="{% url 'cards:card_delete' card.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Удалить карту</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

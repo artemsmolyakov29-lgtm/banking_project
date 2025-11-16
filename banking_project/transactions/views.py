@@ -8,6 +8,9 @@ from django.db import models
 import csv
 import json
 from datetime import datetime, timedelta
+from django.core.paginator import Paginator
+from .forms import TransferForm
+from decimal import Decimal
 
 
 def get_user_model():
@@ -93,11 +96,25 @@ def transaction_list(request):
     if date_to:
         transactions = transactions.filter(created_at__date__lte=date_to)
 
+    # Поиск по номеру транзакции или описанию
+    search_query = request.GET.get('search')
+    if search_query:
+        transactions = transactions.filter(
+            Q(reference_number__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
+
+    # Пагинация
+    paginator = Paginator(transactions, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     return render(request, 'transactions/transaction_list.html', {
-        'transactions': transactions,
+        'page_obj': page_obj,
         'transaction_type': transaction_type,
         'date_from': date_from,
-        'date_to': date_to
+        'date_to': date_to,
+        'search_query': search_query
     })
 
 
@@ -210,8 +227,8 @@ def transaction_report(request):
 
     # Статистика
     total_count = transactions.count()
-    total_amount = sum(t.amount for t in transactions)
-    total_fee = sum(t.fee for t in transactions)
+    total_amount = transactions.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+    total_fee = transactions.aggregate(total=models.Sum('fee'))['total'] or Decimal('0.00')
 
     # Группировка по типам транзакций
     by_type = transactions.values('transaction_type').annotate(
@@ -220,11 +237,20 @@ def transaction_report(request):
         total_fee=models.Sum('fee')
     )
 
+    # НОВАЯ СТАТИСТИКА: Начисления процентов по депозитам
+    deposit_interest_transactions = transactions.filter(
+        transaction_type__in=['deposit_interest', 'interest_accrual']
+    )
+    total_deposit_interest = deposit_interest_transactions.aggregate(
+        total=models.Sum('amount')
+    )['total'] or Decimal('0.00')
+
     return render(request, 'transactions/transaction_report.html', {
         'transactions': transactions,
         'total_count': total_count,
         'total_amount': total_amount,
         'total_fee': total_fee,
+        'total_deposit_interest': total_deposit_interest,  # НОВАЯ СТАТИСТИКА
         'by_type': by_type,
         'date_from': date_from,
         'date_to': date_to,
@@ -295,9 +321,158 @@ def export_transactions_json(request):
             'status': transaction.status,
             'status_display': transaction.get_status_display(),
             'description': transaction.description,
-            'reference_number': transaction.reference_number
+            'reference_number': transaction.reference_number,
+            'deposit_id': transaction.deposit.id if transaction.deposit else None,  # НОВОЕ ПОЛЕ
+            'credit_id': transaction.credit.id if transaction.credit else None,  # НОВОЕ ПОЛЕ
         })
 
     response = HttpResponse(json.dumps(data, ensure_ascii=False), content_type='application/json')
     response['Content-Disposition'] = f'attachment; filename="transactions_{date_from}_{date_to}.json"'
     return response
+
+
+# НОВЫЕ ПРЕДСТАВЛЕНИЯ ДЛЯ ПЕРЕВОДОВ МЕЖДУ СЧЕТАМИ
+
+@login_required
+def transfer_view(request):
+    """Представление для перевода между счетами"""
+    if request.method == 'POST':
+        form = TransferForm(request.POST, user=request.user)
+        if form.is_valid():
+            try:
+                transaction = form.save()
+                messages.success(request,
+                                 f'Перевод на сумму {transaction.amount} выполнен успешно! Комиссия: {transaction.fee}')
+                return redirect('transactions:transfer_success', transaction_id=transaction.id)
+            except Exception as e:
+                messages.error(request, f'Ошибка при выполнении перевода: {str(e)}')
+    else:
+        form = TransferForm(user=request.user)
+
+    # Получаем счета пользователя для автозаполнения (для клиентов)
+    Account = get_account_model()
+    if request.user.role == 'client':
+        user_accounts = Account.objects.filter(client__user=request.user, status='active')
+    else:
+        user_accounts = Account.objects.filter(status='active')[:10]  # Ограничим для сотрудников
+
+    return render(request, 'transactions/transfer.html', {
+        'form': form,
+        'user_accounts': user_accounts
+    })
+
+
+@login_required
+def transfer_success(request, transaction_id):
+    """Страница успешного перевода"""
+    Transaction = get_transaction_model()
+    transaction = get_object_or_404(Transaction, id=transaction_id)
+
+    # Проверяем права доступа
+    if request.user.role == 'client':
+        Client = get_client_model()
+        client = get_object_or_404(Client, user=request.user)
+        client_accounts = client.accounts.all()
+        if (transaction.from_account not in client_accounts and
+                transaction.to_account not in client_accounts):
+            messages.error(request, 'У вас нет доступа к этой транзакции')
+            return redirect('transactions:transaction_list')
+
+    return render(request, 'transactions/transfer_success.html', {
+        'transaction': transaction
+    })
+
+
+@login_required
+def transaction_history(request):
+    """История транзакций пользователя (специализированная для клиентов)"""
+    Transaction = get_transaction_model()
+    Client = get_client_model()
+
+    # Для клиентов показываем только их транзакции
+    if request.user.role == 'client':
+        client = get_object_or_404(Client, user=request.user)
+        accounts = client.accounts.all()
+        transactions = Transaction.objects.filter(
+            Q(from_account__in=accounts) | Q(to_account__in=accounts)
+        ).select_related('from_account', 'to_account', 'currency').order_by('-created_at')
+    else:
+        # Для сотрудников и админов - все транзакции
+        transactions = Transaction.objects.all().select_related(
+            'from_account', 'to_account', 'currency'
+        ).order_by('-created_at')
+
+    # Фильтрация
+    transaction_type = request.GET.get('type')
+    if transaction_type:
+        transactions = transactions.filter(transaction_type=transaction_type)
+
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    if date_from:
+        transactions = transactions.filter(created_at__date__gte=date_from)
+    if date_to:
+        transactions = transactions.filter(created_at__date__lte=date_to)
+
+    # Пагинация
+    paginator = Paginator(transactions, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Получаем типы транзакций для фильтра
+    transaction_types = Transaction.TRANSACTION_TYPES
+
+    return render(request, 'transactions/history.html', {
+        'page_obj': page_obj,
+        'transactions_count': transactions.count(),
+        'transaction_type': transaction_type,
+        'date_from': date_from,
+        'date_to': date_to,
+        'transaction_types': transaction_types
+    })
+
+
+# НОВОЕ ПРЕДСТАВЛЕНИЕ: Отчет по начислениям процентов
+@login_required
+@employee_required
+def deposit_interest_report(request):
+    """Отчет по начислениям процентов по депозитам"""
+    Transaction = get_transaction_model()
+
+    # Фильтрация
+    date_from = request.GET.get('date_from', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    date_to = request.GET.get('date_to', datetime.now().strftime('%Y-%m-%d'))
+    deposit_id = request.GET.get('deposit_id')
+
+    # Транзакции начисления процентов
+    interest_transactions = Transaction.objects.filter(
+        transaction_type__in=['deposit_interest', 'interest_accrual'],
+        created_at__date__range=[date_from, date_to]
+    ).select_related('deposit', 'deposit__client', 'to_account', 'currency')
+
+    if deposit_id:
+        interest_transactions = interest_transactions.filter(deposit_id=deposit_id)
+
+    # Статистика
+    total_interest = interest_transactions.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+    transaction_count = interest_transactions.count()
+
+    # Группировка по депозитам
+    by_deposit = interest_transactions.values(
+        'deposit_id',
+        'deposit__client__full_name',
+        'currency__code'
+    ).annotate(
+        count=models.Count('id'),
+        total_amount=models.Sum('amount')
+    )
+
+    return render(request, 'transactions/deposit_interest_report.html', {
+        'interest_transactions': interest_transactions,
+        'total_interest': total_interest,
+        'transaction_count': transaction_count,
+        'by_deposit': by_deposit,
+        'date_from': date_from,
+        'date_to': date_to,
+        'deposit_id': deposit_id
+    })
