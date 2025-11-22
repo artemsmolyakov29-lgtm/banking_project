@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 import json
+import uuid
 
 
 class ReportTemplate(models.Model):
@@ -16,7 +17,9 @@ class ReportTemplate(models.Model):
         ('credit', 'Отчет по кредитам'),
         ('deposit', 'Отчет по депозитам'),
         ('transaction', 'Отчет по транзакциям'),
-        ('interest_accrual', 'Отчет по начисленным процентам'),  # НОВЫЙ ТИП
+        ('interest_accrual', 'Отчет по начисленным процентам'),
+        ('card', 'Отчет по картам'),
+        ('card_block', 'Отчет по блокировкам карт'),
         ('custom', 'Пользовательский отчет'),
     )
 
@@ -69,17 +72,27 @@ class ReportTemplate(models.Model):
         auto_now=True,
         verbose_name='Дата обновления'
     )
-    # НОВОЕ ПОЛЕ: Категория для организации шаблонов
     category = models.CharField(
         max_length=100,
         default='general',
         verbose_name='Категория'
+    )
+    # НОВОЕ ПОЛЕ: Уникальный идентификатор для API
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        verbose_name='UUID'
     )
 
     class Meta:
         verbose_name = 'Шаблон отчета'
         verbose_name_plural = 'Шаблоны отчетов'
         ordering = ['category', 'name']
+        permissions = [
+            ('can_schedule_reports', 'Может планировать отчеты'),
+            ('can_manage_templates', 'Может управлять шаблонами'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_report_type_display()})"
@@ -99,6 +112,11 @@ class ReportTemplate(models.Model):
             created_by=new_creator,
             category=self.category
         )
+
+    def get_available_formats(self):
+        """Получение доступных форматов для типа отчета"""
+        formats = ['html', 'pdf', 'excel', 'csv', 'json']
+        return formats
 
 
 class SavedReport(models.Model):
@@ -150,7 +168,6 @@ class SavedReport(models.Model):
         default=False,
         verbose_name='Временный файл'
     )
-    # НОВОЕ ПОЛЕ: Ссылка на шаблон (если отчет создан из шаблона)
     template = models.ForeignKey(
         ReportTemplate,
         on_delete=models.SET_NULL,
@@ -159,11 +176,35 @@ class SavedReport(models.Model):
         related_name='saved_reports',
         verbose_name='Шаблон'
     )
-    # НОВОЕ ПОЛЕ: Данные отчета в сжатом виде (для быстрого предпросмотра)
     preview_data = models.JSONField(
         null=True,
         blank=True,
         verbose_name='Данные для предпросмотра'
+    )
+    # НОВОЕ ПОЛЕ: Уникальный идентификатор
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        verbose_name='UUID'
+    )
+    # НОВОЕ ПОЛЕ: Статус генерации отчета
+    GENERATION_STATUS = (
+        ('pending', 'В ожидании'),
+        ('processing', 'В процессе'),
+        ('completed', 'Завершено'),
+        ('failed', 'Ошибка'),
+    )
+    generation_status = models.CharField(
+        max_length=20,
+        choices=GENERATION_STATUS,
+        default='completed',
+        verbose_name='Статус генерации'
+    )
+    # НОВОЕ ПОЛЕ: Сообщение об ошибке
+    error_message = models.TextField(
+        blank=True,
+        verbose_name='Сообщение об ошибке'
     )
 
     class Meta:
@@ -173,6 +214,7 @@ class SavedReport(models.Model):
         indexes = [
             models.Index(fields=['report_type', 'generated_at']),
             models.Index(fields=['generated_by', 'generated_at']),
+            models.Index(fields=['generation_status']),
         ]
 
     def __str__(self):
@@ -208,6 +250,13 @@ class SavedReport(models.Model):
             except OSError:
                 return False
         return False
+
+    def set_generation_status(self, status, error_message=''):
+        """Установка статуса генерации"""
+        self.generation_status = status
+        if error_message:
+            self.error_message = error_message
+        self.save()
 
 
 class ReportSchedule(models.Model):
@@ -247,26 +296,22 @@ class ReportSchedule(models.Model):
         choices=FREQUENCY_CHOICES,
         verbose_name='Частота'
     )
-    # Параметры для еженедельного расписания
     day_of_week = models.IntegerField(
         choices=DAY_OF_WEEK_CHOICES,
         null=True,
         blank=True,
         verbose_name='День недели'
     )
-    # Параметры для ежемесячного расписания
     day_of_month = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(31)],
         null=True,
         blank=True,
         verbose_name='День месяца'
     )
-    # Время генерации
     generation_time = models.TimeField(
         default=timezone.now,
         verbose_name='Время генерации'
     )
-    # Получатели отчета (email)
     recipients = models.TextField(
         blank=True,
         verbose_name='Получатели (email через запятую)'
@@ -290,17 +335,41 @@ class ReportSchedule(models.Model):
         blank=True,
         verbose_name='Последняя генерация'
     )
-    # НОВОЕ ПОЛЕ: Дополнительные параметры
     extra_parameters = models.JSONField(
         null=True,
         blank=True,
         verbose_name='Дополнительные параметры'
+    )
+    # НОВОЕ ПОЛЕ: Форматы для экспорта
+    export_formats = models.JSONField(
+        default=list,
+        verbose_name='Форматы экспорта'
+    )
+    # НОВОЕ ПОЛЕ: Уникальный идентификатор
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        verbose_name='UUID'
+    )
+    # НОВОЕ ПОЛЕ: Сохранять отчеты
+    save_reports = models.BooleanField(
+        default=True,
+        verbose_name='Сохранять отчеты'
+    )
+    # НОВОЕ ПОЛЕ: Количество сохраненных отчетов
+    reports_keep_count = models.IntegerField(
+        default=10,
+        verbose_name='Хранить последних отчетов'
     )
 
     class Meta:
         verbose_name = 'Расписание отчетов'
         verbose_name_plural = 'Расписания отчетов'
         ordering = ['name']
+        permissions = [
+            ('can_manage_schedules', 'Может управлять расписаниями'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_frequency_display()})"
@@ -317,6 +386,10 @@ class ReportSchedule(models.Model):
 
         # Проверяем время
         if now.time() < self.generation_time:
+            return False
+
+        # Если уже генерировали сегодня, не генерируем снова
+        if self.last_generated and self.last_generated.date() == now.date():
             return False
 
         # Проверяем частоту
@@ -340,6 +413,17 @@ class ReportSchedule(models.Model):
         self.last_generated = timezone.now()
         self.save()
 
+    def clean_old_reports(self):
+        """Очистка старых отчетов"""
+        if self.save_reports and self.reports_keep_count > 0:
+            old_reports = SavedReport.objects.filter(
+                template=self.template
+            ).order_by('-generated_at')[self.reports_keep_count:]
+
+            for report in old_reports:
+                report.cleanup_file()
+                report.delete()
+
 
 class DashboardWidget(models.Model):
     """
@@ -350,6 +434,7 @@ class DashboardWidget(models.Model):
         ('chart', 'График'),
         ('table', 'Таблица'),
         ('progress', 'Прогресс'),
+        ('gauge', 'Индикатор'),
     )
 
     CHART_TYPES = (
@@ -357,6 +442,7 @@ class DashboardWidget(models.Model):
         ('line', 'Линейная'),
         ('pie', 'Круговая'),
         ('doughnut', 'Кольцевая'),
+        ('area', 'Областная'),
     )
 
     name = models.CharField(
@@ -408,10 +494,26 @@ class DashboardWidget(models.Model):
         auto_now=True,
         verbose_name='Дата обновления'
     )
-    # НОВОЕ ПОЛЕ: Обновление данных в реальном времени
     refresh_interval = models.IntegerField(
         default=0,
         verbose_name='Интервал обновления (сек)'
+    )
+    # НОВОЕ ПОЛЕ: Цвет виджета
+    color = models.CharField(
+        max_length=20,
+        default='primary',
+        verbose_name='Цвет'
+    )
+    # НОВОЕ ПОЛЕ: Иконка
+    icon = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Иконка'
+    )
+    # НОВОЕ ПОЛЕ: Описание
+    description = models.TextField(
+        blank=True,
+        verbose_name='Описание'
     )
 
     class Meta:
@@ -424,11 +526,126 @@ class DashboardWidget(models.Model):
 
     def get_data(self):
         """Получение данных для виджета"""
-        # Здесь может быть сложная логика получения данных
-        # В зависимости от data_source и parameters
+        # Заглушка для реализации логики получения данных
+        # В реальной реализации здесь будет сложная логика в зависимости от data_source
         return {
             'value': 0,
             'previous_value': 0,
             'change_percent': 0,
             'data': []
         }
+
+
+class ExportFormat(models.Model):
+    """
+    Поддерживаемые форматы экспорта
+    """
+    FORMAT_CHOICES = (
+        ('json', 'JSON'),
+        ('csv', 'CSV'),
+        ('xlsx', 'Excel'),
+        ('pdf', 'PDF'),
+        ('html', 'HTML'),
+    )
+
+    name = models.CharField(
+        max_length=50,
+        verbose_name='Название формата'
+    )
+    format_code = models.CharField(
+        max_length=10,
+        choices=FORMAT_CHOICES,
+        unique=True,
+        verbose_name='Код формата'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Активен'
+    )
+    mime_type = models.CharField(
+        max_length=100,
+        verbose_name='MIME тип'
+    )
+    file_extension = models.CharField(
+        max_length=10,
+        verbose_name='Расширение файла'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='Описание'
+    )
+    # НОВОЕ ПОЛЕ: Максимальный размер данных
+    max_data_size = models.BigIntegerField(
+        default=10485760,  # 10MB
+        verbose_name='Максимальный размер данных (байт)'
+    )
+
+    class Meta:
+        verbose_name = 'Формат экспорта'
+        verbose_name_plural = 'Форматы экспорта'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def is_available_for_report(self, report_type):
+        """Проверка доступности формата для типа отчета"""
+        # Все форматы доступны для всех отчетов
+        return True
+
+
+class AnalyticsDashboard(models.Model):
+    """
+    Дашборды аналитики
+    """
+    name = models.CharField(
+        max_length=200,
+        verbose_name='Название дашборда'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='Описание'
+    )
+    widgets = models.ManyToManyField(
+        DashboardWidget,
+        related_name='dashboards',
+        verbose_name='Виджеты'
+    )
+    is_default = models.BooleanField(
+        default=False,
+        verbose_name='Дашборд по умолчанию'
+    )
+    is_public = models.BooleanField(
+        default=False,
+        verbose_name='Публичный дашборд'
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name='Создатель'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Дата обновления'
+    )
+    # НОВОЕ ПОЛЕ: Настройки дашборда
+    settings = models.JSONField(
+        default=dict,
+        verbose_name='Настройки'
+    )
+
+    class Meta:
+        verbose_name = 'Дашборд аналитики'
+        verbose_name_plural = 'Дашборды аналитики'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def get_visible_widgets(self):
+        """Получение видимых виджетов"""
+        return self.widgets.filter(is_visible=True).order_by('position')

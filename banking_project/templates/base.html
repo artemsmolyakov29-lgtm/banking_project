@@ -9,6 +9,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Reports CSS -->
+    <link href="{% static 'css/reports.css' %}" rel="stylesheet">
     <!-- Custom CSS -->
     <style>
         .sidebar {
@@ -82,7 +84,6 @@
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_list' %}">Все кредиты</a></li>
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_create' %}">Оформить кредит</a></li>
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_products' %}">Кредитные продукты</a></li>
-                                <!-- НОВЫЕ ПУНКТЫ МЕНЮ ДЛЯ КРЕДИТОВ -->
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-history me-2"></i>Платежи по кредитам</a></li>
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-calendar-alt me-2"></i>Графики платежей</a></li>
@@ -107,17 +108,32 @@
                                 <li><a class="dropdown-item" href="{% url 'transactions:history' %}">История операций</a></li>
                             </ul>
                         </li>
+
+                        <!-- ОБНОВЛЕННЫЙ ПУНКТ МЕНЮ ОТЧЕТЫ -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                                 <i class="fas fa-chart-bar me-1"></i>Отчеты
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'reports:report_dashboard' %}">Дашборд отчетов</a></li>
-                                <li><a class="dropdown-item" href="{% url 'reports:client_report' %}">По клиентам</a></li>
-                                <li><a class="dropdown-item" href="{% url 'reports:financial_report' %}">Финансовый</a></li>
-                                <li><a class="dropdown-item" href="{% url 'reports:transaction_report' %}">По транзакциям</a></li>
+                                <li><a class="dropdown-item" href="{% url 'reports:list' %}">
+                                    <i class="fas fa-list me-2"></i>Все отчеты
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'reports:generate' %}">
+                                    <i class="fas fa-plus-circle me-2"></i>Создать отчет
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'reports:schedule' %}">
+                                    <i class="fas fa-clock me-2"></i>Планировщик
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'reports:export' %}">
+                                    <i class="fas fa-download me-2"></i>Экспорт данных
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'reports:analytics_dashboard' %}">
+                                    <i class="fas fa-chart-line me-2"></i>Аналитический дашборд
+                                </a></li>
                             </ul>
                         </li>
+
                         {% endif %}
 
                         {% if user.role == 'client' %}
@@ -148,7 +164,6 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_list' %}">Мои кредиты</a></li>
                                 <li><a class="dropdown-item" href="{% url 'credits:credit_products' %}">Кредитные продукты</a></li>
-                                <!-- НОВЫЕ ПУНКТЫ МЕНЮ ДЛЯ КЛИЕНТОВ -->
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-credit-card me-2"></i>Оплата кредитов</a></li>
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-calendar me-2"></i>Мои платежи</a></li>
@@ -162,6 +177,13 @@
                         {% endif %}
 
                         {% if user.role == 'admin' %}
+                        <!-- НОВЫЙ ПУНКТ МЕНЮ АНАЛИТИКА ДЛЯ АДМИНИСТРАТОРОВ -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'reports:analytics_dashboard' %}">
+                                <i class="fas fa-chart-line me-1"></i>Аналитика
+                            </a>
+                        </li>
+
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                                 <i class="fas fa-cogs me-1"></i>Администрирование
@@ -245,6 +267,8 @@
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Reports JS -->
+    <script src="{% static 'js/reports.js' %}"></script>
 
     <!-- Custom JavaScript -->
     <script>

@@ -1,0 +1,382 @@
+/* static/css/reports.css */
+
+/* Стили для таблиц отчетов */
+.report-table {
+    font-size: 0.875rem;
+}
+
+.report-table th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+}
+
+.report-table td {
+    vertical-align: middle;
+}
+
+.report-table .status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.report-table .actions-column {
+    width: 120px;
+    text-align: center;
+}
+
+/* Стили для форм параметров */
+.report-parameters {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.parameter-group {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 0.375rem;
+    border: 1px solid #e9ecef;
+}
+
+.parameter-group h6 {
+    color: #495057;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.dynamic-parameters {
+    transition: all 0.3s ease;
+}
+
+.dynamic-parameters.collapsed {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+}
+
+.dynamic-parameters.expanded {
+    max-height: 500px;
+    opacity: 1;
+}
+
+/* Стили для дашборда аналитики */
+.analytics-dashboard {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.dashboard-card {
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-card .card-header {
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem 1.25rem;
+}
+
+.dashboard-card .card-body {
+    padding: 1.5rem;
+}
+
+.kpi-card {
+    border: none;
+    border-radius: 0.5rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.kpi-card .trend-indicator {
+    font-size: 0.75rem;
+    opacity: 0.9;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    pointer-events: none;
+}
+
+/* Стили для элементов экспорта */
+.export-queue {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.export-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #007bff;
+}
+
+.export-item.completed {
+    border-left-color: #28a745;
+}
+
+.export-item.failed {
+    border-left-color: #dc3545;
+}
+
+.export-item.processing {
+    border-left-color: #ffc107;
+}
+
+.export-progress {
+    height: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.export-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    transition: width 0.3s ease;
+}
+
+.export-format-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: #6c757d;
+    color: white;
+    border-radius: 0.25rem;
+}
+
+/* Стили для предпросмотра */
+.data-preview {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}
+
+.preview-table {
+    font-size: 0.75rem;
+    margin-bottom: 0;
+}
+
+.preview-table th {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Responsive стили */
+@media (max-width: 768px) {
+    .report-table {
+        font-size: 0.75rem;
+    }
+
+    .dashboard-card .card-body {
+        padding: 1rem;
+    }
+
+    .chart-container {
+        height: 250px;
+    }
+
+    .parameter-group {
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .export-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .kpi-card .h5 {
+        font-size: 1.1rem;
+    }
+}
+
+/* Стили для фильтров и поиска */
+.report-filters {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+
+.filter-group {
+    margin-bottom: 1rem;
+}
+
+.filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.date-range-picker {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.date-range-picker .form-control {
+    flex: 1;
+}
+
+/* Стили для загрузки и состояний */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: inherit;
+}
+
+.loading-spinner {
+    width: 3rem;
+    height: 3rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Кастомные стили для Chart.js */
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.legend-color {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.25rem;
+}
+
+/* Стили для вкладок отчетов */
+.report-tabs .nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.report-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+}
+
+.report-tabs .nav-link.active {
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
+    background: transparent;
+}
+
+.report-tabs .nav-link:hover {
+    border: none;
+    color: #0056b3;
+}
+
+/* Стили для уведомлений системы отчетности */
+.report-notification {
+    border-left: 4px solid #007bff;
+    background: #f8f9fa;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.375rem;
+}
+
+.report-notification.success {
+    border-left-color: #28a745;
+    background: #d4edda;
+}
+
+.report-notification.warning {
+    border-left-color: #ffc107;
+    background: #fff3cd;
+}
+
+.report-notification.error {
+    border-left-color: #dc3545;
+    background: #f8d7da;
+}

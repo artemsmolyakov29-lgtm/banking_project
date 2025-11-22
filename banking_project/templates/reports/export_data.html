@@ -1,0 +1,421 @@
+<!-- reports/templates/reports/export_data.html -->
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Экспорт данных{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Экспорт данных</h1>
+                <a href="{% url 'reports:list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Назад к отчетам
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-download"></i> Параметры экспорта
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="export-form">
+                                {% csrf_token %}
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="data_type" class="form-label">Тип данных</label>
+                                        <select class="form-select" id="data_type" name="data_type" required>
+                                            <option value="">Выберите тип данных</option>
+                                            <option value="clients">Данные клиентов</option>
+                                            <option value="transactions">Транзакции</option>
+                                            <option value="financial">Финансовые данные</option>
+                                            <option value="operations">Операционные данные</option>
+                                            <option value="analytics">Аналитические данные</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="format" class="form-label">Формат экспорта</label>
+                                        <select class="form-select" id="format" name="format" required>
+                                            <option value="excel">Excel (.xlsx)</option>
+                                            <option value="csv">CSV</option>
+                                            <option value="json">JSON</option>
+                                            <option value="xml">XML</option>
+                                            <option value="pdf">PDF</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Динамические параметры в зависимости от типа данных -->
+                                    <div class="col-12" id="clients-options">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Включаемые поля</label>
+                                                <div class="border rounded p-3">
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="client_fields" value="basic_info" checked>
+                                                                <label class="form-check-label">Основная информация</label>
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="client_fields" value="contact_info" checked>
+                                                                <label class="form-check-label">Контактные данные</label>
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="client_fields" value="financial_info">
+                                                                <label class="form-check-label">Финансовая информация</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="client_fields" value="transactions">
+                                                                <label class="form-check-label">История транзакций</label>
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="client_fields" value="ratings">
+                                                                <label class="form-check-label">Рейтинги и оценки</label>
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="client_fields" value="metadata">
+                                                                <label class="form-check-label">Метаданные</label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Фильтры</label>
+                                                <div class="border rounded p-3">
+                                                    <div class="mb-3">
+                                                        <label class="form-label small">Тип клиента</label>
+                                                        <select class="form-select form-select-sm" name="client_type_filter">
+                                                            <option value="">Все типы</option>
+                                                            <option value="vip">VIP</option>
+                                                            <option value="regular">Обычные</option>
+                                                            <option value="corporate">Корпоративные</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label small">Минимальный рейтинг</label>
+                                                        <input type="range" class="form-range" name="min_rating_filter"
+                                                               min="0" max="100" value="0" oninput="this.nextElementSibling.value = this.value">
+                                                        <output>0</output>
+                                                    </div>
+                                                    <div>
+                                                        <label class="form-label small">Дата регистрации</label>
+                                                        <input type="date" class="form-control form-control-sm" name="registration_date_from">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12" id="transactions-options" style="display: none;">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="transactions_date_from" class="form-label">Дата начала</label>
+                                                <input type="date" class="form-control" id="transactions_date_from" name="transactions_date_from">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="transactions_date_to" class="form-label">Дата окончания</label>
+                                                <input type="date" class="form-control" id="transactions_date_to" name="transactions_date_to">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Типы транзакций</label>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="transaction_types" value="income" checked>
+                                                            <label class="form-check-label">Доходы</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="transaction_types" value="expense" checked>
+                                                            <label class="form-check-label">Расходы</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="transaction_types" value="transfer">
+                                                            <label class="form-check-label">Переводы</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label for="file_name" class="form-label">Имя файла</label>
+                                        <input type="text" class="form-control" id="file_name" name="file_name"
+                                               placeholder="Введите имя файла для экспорта" required>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="include_headers" name="include_headers" checked>
+                                            <label class="form-check-label" for="include_headers">
+                                                Включать заголовки столбцов
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="compress_file" name="compress_file">
+                                            <label class="form-check-label" for="compress_file">
+                                                Сжимать файл (ZIP)
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="split_large_files" name="split_large_files">
+                                            <label class="form-check-label" for="split_large_files">
+                                                Разделять большие файлы (более 10 000 записей)
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle"></i>
+                                            <strong>Информация:</strong> Экспорт больших объемов данных может занять несколько минут.
+                                            Вы получите уведомление по завершении процесса.
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary btn-lg">
+                                            <i class="fas fa-download"></i> Экспортировать данные
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="preview-export-btn">
+                                            <i class="fas fa-eye"></i> Предпросмотр
+                                        </button>
+                                        <a href="{% url 'reports:list' %}" class="btn btn-link">Отмена</a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <!-- Статистика экспорта -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-bar"></i> Статистика экспорта
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="border rounded p-3">
+                                        <h4 class="text-primary">{{ export_stats.total_exports|default:"0" }}</h4>
+                                        <small class="text-muted">Всего экспортов</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="border rounded p-3">
+                                        <h4 class="text-success">{{ export_stats.successful_exports|default:"0" }}</h4>
+                                        <small class="text-muted">Успешных</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <h6>Популярные форматы:</h6>
+                                <div class="mt-2">
+                                    {% if export_stats.popular_formats %}
+                                        {% for format in export_stats.popular_formats %}
+                                        <span class="badge bg-light text-dark me-1 mb-1">
+                                            {{ format.format }}: {{ format.count }}
+                                        </span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted small">Нет данных</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Последние экспорты -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-history"></i> Последние экспорты
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_exports %}
+                            <div class="list-group list-group-flush">
+                                {% for export in recent_exports %}
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ export.file_name }}</h6>
+                                        <small>{{ export.created_at|timesince }} назад</small>
+                                    </div>
+                                    <p class="mb-1 small text-muted">
+                                        {{ export.get_data_type_display }} • {{ export.get_format_display }}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">{{ export.file_size|filesizeformat }}</small>
+                                        <a href="{{ export.file_path.url }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center small py-3">Нет недавних экспортов</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Быстрый экспорт -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-bolt"></i> Быстрый экспорт
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm text-start quick-export-btn"
+                                        data-preset="clients_basic">
+                                    <i class="fas fa-users"></i> Базовая информация по клиентам
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm text-start quick-export-btn"
+                                        data-preset="recent_transactions">
+                                    <i class="fas fa-exchange-alt"></i> Транзакции за последний месяц
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm text-start quick-export-btn"
+                                        data-preset="financial_summary">
+                                    <i class="fas fa-chart-pie"></i> Финансовая сводка
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка изменения типа данных
+    document.getElementById('data_type').addEventListener('change', function() {
+        const dataType = this.value;
+
+        // Скрываем все опции
+        document.querySelectorAll('[id$="-options"]').forEach(options => {
+            options.style.display = 'none';
+        });
+
+        // Показываем соответствующие опции
+        if (dataType) {
+            const optionsElement = document.getElementById(dataType + '-options');
+            if (optionsElement) {
+                optionsElement.style.display = 'block';
+            }
+        }
+    });
+
+    // Генерация имени файла по умолчанию
+    const fileNameInput = document.getElementById('file_name');
+    const dataTypeSelect = document.getElementById('data_type');
+    const formatSelect = document.getElementById('format');
+
+    function generateFileName() {
+        const dataType = dataTypeSelect.value || 'data';
+        const format = formatSelect.value;
+        const date = new Date().toISOString().split('T')[0];
+
+        let extension = '';
+        switch (format) {
+            case 'excel': extension = '.xlsx'; break;
+            case 'csv': extension = '.csv'; break;
+            case 'json': extension = '.json'; break;
+            case 'xml': extension = '.xml'; break;
+            case 'pdf': extension = '.pdf'; break;
+            default: extension = '.txt';
+        }
+
+        fileNameInput.value = `${dataType}_export_${date}${extension}`;
+    }
+
+    dataTypeSelect.addEventListener('change', generateFileName);
+    formatSelect.addEventListener('change', generateFileName);
+
+    // Инициализация при загрузке
+    generateFileName();
+
+    // Обработка предпросмотра
+    document.getElementById('preview-export-btn').addEventListener('click', function() {
+        alert('Функция предпросмотра будет реализована в следующей версии');
+    });
+
+    // Обработка быстрого экспорта
+    document.querySelectorAll('.quick-export-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const preset = this.getAttribute('data-preset');
+            loadQuickExport(preset);
+        });
+    });
+});
+
+function loadQuickExport(preset) {
+    const presets = {
+        clients_basic: {
+            data_type: 'clients',
+            format: 'excel',
+            client_fields: ['basic_info', 'contact_info'],
+            file_name: 'clients_basic_' + new Date().toISOString().split('T')[0] + '.xlsx'
+        },
+        recent_transactions: {
+            data_type: 'transactions',
+            format: 'csv',
+            transactions_date_from: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0],
+            transactions_date_to: new Date().toISOString().split('T')[0],
+            file_name: 'recent_transactions_' + new Date().toISOString().split('T')[0] + '.csv'
+        },
+        financial_summary: {
+            data_type: 'financial',
+            format: 'pdf',
+            file_name: 'financial_summary_' + new Date().toISOString().split('T')[0] + '.pdf'
+        }
+    };
+
+    const presetData = presets[preset];
+    if (presetData) {
+        // Заполняем форму данными пресета
+        Object.keys(presetData).forEach(key => {
+            const element = document.querySelector(`[name="${key}"]`);
+            if (element) {
+                if (element.type === 'checkbox' && Array.isArray(presetData[key])) {
+                    // Для чекбоксов с массивами значений
+                    const values = presetData[key];
+                    document.querySelectorAll(`[name="${key}"]`).forEach(checkbox => {
+                        checkbox.checked = values.includes(checkbox.value);
+                    });
+                } else {
+                    element.value = presetData[key];
+                }
+            }
+        });
+
+        // Обновляем отображение опций
+        document.getElementById('data_type').dispatchEvent(new Event('change'));
+
+        alert(`Пресет "${preset}" загружен`);
+    }
+}
+</script>
+{% endblock %}

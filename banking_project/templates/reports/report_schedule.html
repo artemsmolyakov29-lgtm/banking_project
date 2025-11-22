@@ -1,0 +1,388 @@
+<!-- reports/templates/reports/report_schedule.html -->
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Планирование отчетов{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Планирование отчетов</h1>
+                <a href="{% url 'reports:list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Назад к отчетам
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6">
+                    <!-- Форма создания расписания -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-plus-circle"></i> Создать расписание
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="schedule-form">
+                                {% csrf_token %}
+
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="schedule_name" class="form-label">Название расписания</label>
+                                        <input type="text" class="form-control" id="schedule_name" name="name"
+                                               placeholder="Например: Еженедельный финансовый отчет" required>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="report_type" class="form-label">Тип отчета</label>
+                                        <select class="form-select" id="report_type" name="report_type" required>
+                                            <option value="">Выберите тип отчета</option>
+                                            <option value="financial">Финансовый отчет</option>
+                                            <option value="client">Отчет по клиентам</option>
+                                            <option value="operational">Операционный отчет</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="frequency" class="form-label">Частота</label>
+                                        <select class="form-select" id="frequency" name="frequency" required>
+                                            <option value="daily">Ежедневно</option>
+                                            <option value="weekly" selected>Еженедельно</option>
+                                            <option value="monthly">Ежемесячно</option>
+                                            <option value="quarterly">Ежеквартально</option>
+                                            <option value="yearly">Ежегодно</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Дополнительные параметры в зависимости от частоты -->
+                                    <div class="col-12" id="weekly-options">
+                                        <label class="form-label">День недели</label>
+                                        <div class="row">
+                                            {% for day in "пн вт ср чт пт сб вс"|split:" " %}
+                                            <div class="col">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="week_day"
+                                                           id="day_{{ forloop.counter }}" value="{{ forloop.counter0 }}"
+                                                           {% if forloop.counter0 == 1 %}checked{% endif %}>
+                                                    <label class="form-check-label" for="day_{{ forloop.counter }}">
+                                                        {{ day }}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12 d-none" id="monthly-options">
+                                        <label for="month_day" class="form-label">День месяца</label>
+                                        <select class="form-select" id="month_day" name="month_day">
+                                            {% for i in "31"|range:1 %}
+                                            <option value="{{ i }}" {% if i == 1 %}selected{% endif %}>{{ i }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label for="time" class="form-label">Время выполнения</label>
+                                        <input type="time" class="form-control" id="time" name="time" value="09:00" required>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label for="recipients" class="form-label">Получатели email</label>
+                                        <textarea class="form-control" id="recipients" name="recipients"
+                                                  rows="3" placeholder="Введите email адреса через запятую"></textarea>
+                                        <div class="form-text">Оставьте пустым, если отправка по email не требуется</div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                                            <label class="form-check-label" for="is_active">
+                                                Активное расписание
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save"></i> Сохранить расписание
+                                        </button>
+                                        <button type="reset" class="btn btn-outline-secondary">Сбросить</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <!-- Список активных расписаний -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-list"></i> Активные расписания
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if schedules %}
+                            <div class="list-group list-group-flush">
+                                {% for schedule in schedules %}
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ schedule.name }}</h6>
+                                            <p class="mb-1 small text-muted">
+                                                <strong>Тип:</strong> {{ schedule.get_report_type_display }} |
+                                                <strong>Частота:</strong> {{ schedule.get_frequency_display }} |
+                                                <strong>Время:</strong> {{ schedule.scheduled_time|time:"H:i" }}
+                                            </p>
+                                            {% if schedule.recipients %}
+                                            <p class="mb-1 small">
+                                                <strong>Получатели:</strong> {{ schedule.recipients }}
+                                            </p>
+                                            {% endif %}
+                                            {% if schedule.last_generated %}
+                                            <p class="mb-0 small">
+                                                <strong>Последний запуск:</strong> {{ schedule.last_generated|date:"d.m.Y H:i" }}
+                                            </p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary run-schedule-btn"
+                                                    data-schedule-id="{{ schedule.id }}" title="Запустить сейчас">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                                <span class="visually-hidden">Действия</span>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <a class="dropdown-item edit-schedule-btn" href="#"
+                                                       data-schedule-id="{{ schedule.id }}">
+                                                        <i class="fas fa-edit"></i> Редактировать
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item toggle-schedule-btn" href="#"
+                                                       data-schedule-id="{{ schedule.id }}" data-is-active="false">
+                                                        <i class="fas fa-pause"></i> Приостановить
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger delete-schedule-btn" href="#"
+                                                       data-schedule-id="{{ schedule.id }}" data-schedule-name="{{ schedule.name }}">
+                                                        <i class="fas fa-trash"></i> Удалить
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        {% if schedule.is_active %}
+                                        <span class="badge bg-success">Активно</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Приостановлено</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-clock fa-3x text-muted mb-3"></i>
+                                <h6>Нет активных расписаний</h6>
+                                <p class="text-muted small">Создайте первое расписание для автоматической генерации отчетов</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- История выполнения -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-history"></i> История выполнения
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if execution_history %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Расписание</th>
+                                            <th>Время</th>
+                                            <th>Статус</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for history in execution_history %}
+                                        <tr>
+                                            <td>{{ history.schedule.name }}</td>
+                                            <td>{{ history.executed_at|date:"d.m.Y H:i" }}</td>
+                                            <td>
+                                                {% if history.is_successful %}
+                                                <span class="badge bg-success">Успешно</span>
+                                                {% else %}
+                                                <span class="badge bg-danger">Ошибка</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center small py-3">История выполнения пока пуста</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка изменения частоты
+    document.getElementById('frequency').addEventListener('change', function() {
+        const frequency = this.value;
+
+        // Скрываем все опции
+        document.getElementById('weekly-options').classList.add('d-none');
+        document.getElementById('monthly-options').classList.add('d-none');
+
+        // Показываем соответствующие опции
+        if (frequency === 'weekly') {
+            document.getElementById('weekly-options').classList.remove('d-none');
+        } else if (frequency === 'monthly') {
+            document.getElementById('monthly-options').classList.remove('d-none');
+        }
+    });
+
+    // Инициализация при загрузке
+    document.getElementById('frequency').dispatchEvent(new Event('change'));
+
+    // Обработка запуска расписания
+    document.querySelectorAll('.run-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const scheduleId = this.getAttribute('data-schedule-id');
+            runScheduleNow(scheduleId);
+        });
+    });
+
+    // Обработка редактирования расписания
+    document.querySelectorAll('.edit-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const scheduleId = this.getAttribute('data-schedule-id');
+            editSchedule(scheduleId);
+        });
+    });
+
+    // Обработка переключения статуса расписания
+    document.querySelectorAll('.toggle-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const scheduleId = this.getAttribute('data-schedule-id');
+            const isActive = this.getAttribute('data-is-active') === 'true';
+            toggleSchedule(scheduleId, isActive);
+        });
+    });
+
+    // Обработка удаления расписания
+    document.querySelectorAll('.delete-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const scheduleId = this.getAttribute('data-schedule-id');
+            const scheduleName = this.getAttribute('data-schedule-name');
+            deleteSchedule(scheduleId, scheduleName);
+        });
+    });
+});
+
+function runScheduleNow(scheduleId) {
+    if (confirm('Запустить расписание сейчас?')) {
+        fetch(`/reports/schedules/${scheduleId}/run-now/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Расписание успешно запущено');
+                location.reload();
+            } else {
+                alert('Ошибка при запуске расписания: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Ошибка при запуске расписания: ' + error);
+        });
+    }
+}
+
+function toggleSchedule(scheduleId, isActive) {
+    const action = isActive ? 'активировать' : 'приостановить';
+    if (confirm(`Вы уверены, что хотите ${action} это расписание?`)) {
+        fetch(`/reports/schedules/${scheduleId}/toggle/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ is_active: isActive })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка при изменении статуса расписания: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Ошибка при изменении статуса расписания: ' + error);
+        });
+    }
+}
+
+function deleteSchedule(scheduleId, scheduleName) {
+    if (confirm(`Вы уверены, что хотите удалить расписание "${scheduleName}"?`)) {
+        fetch(`/reports/schedules/${scheduleId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка при удалении расписания: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Ошибка при удалении расписания: ' + error);
+        });
+    }
+}
+
+function editSchedule(scheduleId) {
+    // Здесь должна быть логика редактирования расписания
+    alert('Редактирование расписания будет реализовано в следующей версии');
+}
+</script>
+{% endblock %}

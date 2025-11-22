@@ -1,0 +1,366 @@
+<!-- reports/templates/reports/report_generate.html -->
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Создание отчета{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Создание отчета</h1>
+                <a href="{% url 'reports:list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Назад к списку
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#financial-tab" type="button" role="tab">
+                                        Финансовый отчет
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#client-tab" type="button" role="tab">
+                                        Отчет по клиентам
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#operational-tab" type="button" role="tab">
+                                        Операционный отчет
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="report-form">
+                                {% csrf_token %}
+
+                                <div class="tab-content">
+                                    <!-- Финансовый отчет -->
+                                    <div class="tab-pane fade show active" id="financial-tab" role="tabpanel">
+                                        <input type="hidden" name="report_type" value="financial">
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="financial_date_from" class="form-label">Дата начала периода</label>
+                                                <input type="date" class="form-control" id="financial_date_from"
+                                                       name="financial_date_from" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="financial_date_to" class="form-label">Дата окончания периода</label>
+                                                <input type="date" class="form-control" id="financial_date_to"
+                                                       name="financial_date_to" required>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="include_detailed" name="include_detailed">
+                                                    <label class="form-check-label" for="include_detailed">
+                                                        Включить детализированные данные
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Включаемые метрики</label>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="metrics" value="revenue" checked>
+                                                            <label class="form-check-label">Выручка</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="metrics" value="expenses" checked>
+                                                            <label class="form-check-label">Расходы</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="metrics" value="profit" checked>
+                                                            <label class="form-check-label">Прибыль</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Отчет по клиентам -->
+                                    <div class="tab-pane fade" id="client-tab" role="tabpanel">
+                                        <input type="hidden" name="report_type" value="client">
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Тип клиентов</label>
+                                                <div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="client_type" id="all_clients" value="all" checked>
+                                                        <label class="form-check-label" for="all_clients">Все клиенты</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="client_type" id="vip_clients" value="vip">
+                                                        <label class="form-check-label" for="vip_clients">Только VIP</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="client_type" id="regular_clients" value="regular">
+                                                        <label class="form-check-label" for="regular_clients">Только обычные</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="min_rating" class="form-label">Минимальный кредитный рейтинг</label>
+                                                <input type="number" class="form-control" id="min_rating" name="min_rating"
+                                                       min="0" max="100" step="1" placeholder="0-100">
+                                            </div>
+                                            <div class="col-12">
+                                                <label for="client_groups" class="form-label">Группы клиентов</label>
+                                                <select class="form-select" id="client_groups" name="client_groups" multiple>
+                                                    <option value="corporate">Корпоративные</option>
+                                                    <option value="individual">Физические лица</option>
+                                                    <option value="government">Государственные</option>
+                                                    <option value="international">Международные</option>
+                                                </select>
+                                                <div class="form-text">Для выбора нескольких групп удерживайте Ctrl</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Операционный отчет -->
+                                    <div class="tab-pane fade" id="operational-tab" role="tabpanel">
+                                        <input type="hidden" name="report_type" value="operational">
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="operational_date_from" class="form-label">Дата начала</label>
+                                                <input type="date" class="form-control" id="operational_date_from" name="operational_date_from">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="operational_date_to" class="form-label">Дата окончания</label>
+                                                <input type="date" class="form-control" id="operational_date_to" name="operational_date_to">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Тип операционных данных</label>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="operational_data" value="transactions" checked>
+                                                            <label class="form-check-label">Транзакции</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="operational_data" value="operations">
+                                                            <label class="form-check-label">Операции</label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="operational_data" value="performance">
+                                                            <label class="form-check-label">Производительность</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 pt-3 border-top">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="report_name" class="form-label">Название отчета</label>
+                                            <input type="text" class="form-control" id="report_name" name="report_name"
+                                                   placeholder="Введите название отчета" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="format" class="form-label">Формат экспорта</label>
+                                            <select class="form-select" id="format" name="format" required>
+                                                <option value="html">HTML</option>
+                                                <option value="pdf">PDF</option>
+                                                <option value="excel">Excel</option>
+                                                <option value="csv">CSV</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="save_template" name="save_template">
+                                                <label class="form-check-label" for="save_template">
+                                                    Сохранить как шаблон для повторного использования
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-play-circle"></i> Сгенерировать отчет
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="preview-btn">
+                                        <i class="fas fa-eye"></i> Предпросмотр
+                                    </button>
+                                    <a href="{% url 'reports:list' %}" class="btn btn-link">Отмена</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <!-- Боковая панель с подсказками -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-info-circle"></i> Информация
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="financial-help" class="help-section">
+                                <h6>Финансовый отчет</h6>
+                                <p class="small text-muted">
+                                    Генерирует сводку по финансовым показателям за выбранный период.
+                                    Включает данные по выручке, расходам, прибыли и другим финансовым метрикам.
+                                </p>
+                            </div>
+                            <div id="client-help" class="help-section d-none">
+                                <h6>Отчет по клиентам</h6>
+                                <p class="small text-muted">
+                                    Анализирует клиентскую базу по различным параметрам.
+                                    Позволяет фильтровать клиентов по типу, рейтингу и группам.
+                                </p>
+                            </div>
+                            <div id="operational-help" class="help-section d-none">
+                                <h6>Операционный отчет</h6>
+                                <p class="small text-muted">
+                                    Отображает операционные показатели и эффективность бизнес-процессов.
+                                    Включает данные по транзакциям, операциям и производительности.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Быстрые шаблоны -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-magic"></i> Быстрые шаблоны
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm text-start"
+                                        data-template="monthly_financial">
+                                    <i class="fas fa-calendar-alt"></i> Ежемесячный финансовый отчет
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm text-start"
+                                        data-template="vip_clients">
+                                    <i class="fas fa-crown"></i> Отчет по VIP клиентам
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm text-start"
+                                        data-template="quarterly_operations">
+                                    <i class="fas fa-chart-line"></i> Квартальный операционный отчет
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка переключения вкладок
+    const tabTriggers = document.querySelectorAll('[data-bs-toggle="tab"]');
+
+    tabTriggers.forEach(trigger => {
+        trigger.addEventListener('show.bs.tab', function(event) {
+            // Скрываем все подсказки
+            document.querySelectorAll('.help-section').forEach(section => {
+                section.classList.add('d-none');
+            });
+
+            // Показываем соответствующую подсказку
+            const target = event.target.getAttribute('data-bs-target');
+            const helpSection = document.querySelector(target.replace('-tab', '-help'));
+            if (helpSection) {
+                helpSection.classList.remove('d-none');
+            }
+        });
+    });
+
+    // Обработка предпросмотра
+    document.getElementById('preview-btn').addEventListener('click', function() {
+        alert('Функция предпросмотра будет реализована в следующей версии');
+    });
+
+    // Обработка быстрых шаблонов
+    document.querySelectorAll('[data-template]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const templateName = this.getAttribute('data-template');
+            loadTemplate(templateName);
+        });
+    });
+
+    // Установка дат по умолчанию для финансового отчета
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    document.getElementById('financial_date_from').value = lastMonth.toISOString().split('T')[0];
+    document.getElementById('financial_date_to').value = endOfLastMonth.toISOString().split('T')[0];
+
+    // Установка названия отчета по умолчанию
+    document.getElementById('report_name').value = `Отчет от ${new Date().toLocaleDateString()}`;
+});
+
+function loadTemplate(templateName) {
+    // Загрузка параметров шаблона
+    const templates = {
+        monthly_financial: {
+            report_type: 'financial',
+            financial_date_from: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0],
+            financial_date_to: new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0],
+            report_name: 'Ежемесячный финансовый отчет'
+        },
+        vip_clients: {
+            report_type: 'client',
+            client_type: 'vip',
+            report_name: 'Отчет по VIP клиентам'
+        },
+        quarterly_operations: {
+            report_type: 'operational',
+            report_name: 'Квартальный операционный отчет'
+        }
+    };
+
+    const template = templates[templateName];
+    if (template) {
+        // Заполняем форму данными шаблона
+        Object.keys(template).forEach(key => {
+            const element = document.querySelector(`[name="${key}"]`);
+            if (element) {
+                element.value = template[key];
+            }
+        });
+
+        // Переключаемся на соответствующую вкладку
+        const tabButton = document.querySelector(`[data-bs-target="#${template.report_type}-tab"]`);
+        if (tabButton) {
+            new bootstrap.Tab(tabButton).show();
+        }
+
+        alert(`Шаблон "${template.report_name}" загружен`);
+    }
+}
+</script>
+{% endblock %}
