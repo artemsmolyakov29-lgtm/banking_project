@@ -44,6 +44,10 @@ INSTALLED_APPS = [
     'widget_tweaks',
 ]
 
+# DEBUG-инструменты добавляем ПОСЛЕ всех приложений
+if DEBUG:
+    INSTALLED_APPS.append('debug_toolbar')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -55,6 +59,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'audit.middleware.AuditMiddleware',
 ]
+
+# DEBUG-инструменты добавляем в начало
+if DEBUG:
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'banking_project.urls'
 
@@ -130,10 +138,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
 
-# Login URLs
-LOGIN_REDIRECT_URL = 'dashboard'
-LOGIN_URL = 'login'
-LOGOUT_REDIRECT_URL = 'login'
+# Login URLs - ИСПРАВЛЕНО: добавляем namespace
+LOGIN_REDIRECT_URL = 'users:dashboard'  # Было: 'dashboard'
+LOGIN_URL = 'users:login'  # Было: 'login'
+LOGOUT_REDIRECT_URL = 'users:login'  # Было: 'login'
 
 # Email settings (for development)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
@@ -190,7 +198,7 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-# НОВЫЕ НАСТРОЙКИ: Система отчетности
+# Система отчетности
 REPORT_SETTINGS = {
     'STORAGE_PATH': os.path.join(BASE_DIR, 'reports_storage'),
     'MAX_FILE_SIZE': 100 * 1024 * 1024,  # 100MB
@@ -203,7 +211,7 @@ REPORT_SETTINGS = {
     'SCHEDULE_RETENTION_DAYS': 365,
 }
 
-# НОВЫЕ НАСТРОЙКИ: Аудит и мониторинг
+# Аудит и мониторинг
 AUDIT_SETTINGS = {
     'ENABLE_AUDIT_LOG': True,
     'LOG_RETENTION_DAYS': 365,
@@ -214,7 +222,7 @@ AUDIT_SETTINGS = {
     'AUTO_CLEANUP_ENABLED': True,
 }
 
-# НОВЫЕ НАСТРОЙКИ: Резервное копирование
+# Резервное копирование
 BACKUP_SETTINGS = {
     'ENABLE_AUTO_BACKUP': False,
     'BACKUP_SCHEDULE': '0 2 * * *',  # Ежедневно в 2:00
@@ -225,7 +233,7 @@ BACKUP_SETTINGS = {
     'ENCRYPT_BACKUPS': True,
 }
 
-# НОВЫЕ НАСТРОЙКИ: Экспорт данных
+# Экспорт данных
 EXPORT_SETTINGS = {
     'MAX_RECORDS_PER_EXPORT': 10000,
     'ENABLE_BATCH_EXPORT': True,
@@ -335,7 +343,7 @@ LOGGING = {
     },
 }
 
-# НОВЫЕ НАСТРОЙКИ: Кэширование
+# Кэширование
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
@@ -346,43 +354,38 @@ CACHES = {
     }
 }
 
-# НОВЫЕ НАСТРОЙКИ: Сессии
+# В режиме разработки используем простой кэш
+if DEBUG:
+    CACHES['default'] = {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+
+# Сессии
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 SESSION_COOKIE_AGE = 1209600  # 2 недели в секундах
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# НОВЫЕ НАСТРОЙКИ: Internationalization
+# Internationalization
 FORMAT_MODULE_PATH = [
     'banking_project.formats',
 ]
 
-# НОВЫЕ НАСТРОЙКИ: File uploads
+# File uploads
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
-# НОВЫЕ НАСТРОЙКИ: Testing
+# Testing
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-# НОВЫЕ НАСТРОЙКИ: Django Admin
+# Django Admin
 ADMIN_SITE_HEADER = 'Администрирование Банковской системы'
 ADMIN_SITE_TITLE = 'Банковская система'
 ADMIN_INDEX_TITLE = 'Панель управления'
 
-# НАСТРОЙКИ ДЛЯ РАЗРАБОТКИ
+# Настройки для debug_toolbar в режиме разработки
 if DEBUG:
-    # Отладочные инструменты
-    INSTALLED_APPS += [
-        'debug_toolbar',
-    ]
-    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
-
     INTERNAL_IPS = [
         '127.0.0.1',
         'localhost',
     ]
-
-    # Упрощенные настройки для разработки
-    CACHES['default'] = {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-    }

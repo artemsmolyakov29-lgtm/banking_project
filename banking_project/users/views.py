@@ -5,8 +5,13 @@ from django.contrib import messages
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth import get_user_model
 from django.apps import apps
+from django.utils import timezone
+from django.db.models import Sum, Q
+from datetime import date, timedelta
+from decimal import Decimal
 
 User = get_user_model()
+
 
 def get_form_class():
     """Ленивая загрузка форм для избежания циклических импортов"""
@@ -92,56 +97,141 @@ def dashboard_view(request):
     user = request.user
     context = {}
 
-    if user.role == 'client':
-        # Дашборд для клиента
-        try:
-            client = user.client_profile
-            accounts = client.accounts.filter(status='active')[:5] if hasattr(client, 'accounts') else []
-            credits = client.credits.filter(status='active')[:5] if hasattr(client, 'credits') else []
-            deposits = client.deposits.filter(status='active')[:5] if hasattr(client, 'deposits') else []
-
-            context.update({
-                'client': client,
-                'accounts': accounts,
-                'credits': credits,
-                'deposits': deposits,
-                'total_balance': 0,
-                'products_count': {
-                    'accounts': len(accounts),
-                    'credits': len(credits),
-                    'deposits': len(deposits),
-                    'total': len(accounts) + len(credits) + len(deposits)
-                },
-            })
-        except Exception as e:
-            messages.error(request, f'Ошибка загрузки данных клиента: {str(e)}')
-
-        template = 'users/dashboard_client.html'
-
-    elif user.role in ['employee', 'admin']:
-        # Дашборд для сотрудника и администратора
-        try:
+    try:
+        if user.role == 'client':
+            # Дашборд для клиента
             Client = apps.get_model('clients', 'Client')
             Account = apps.get_model('accounts', 'Account')
+            Transaction = apps.get_model('transactions', 'Transaction')
             Credit = apps.get_model('credits', 'Credit')
+            Deposit = apps.get_model('deposits', 'Deposit')
+            CreditPayment = apps.get_model('credits', 'CreditPayment')
+
+            # Получаем клиента
+            client = Client.objects.filter(user=user).first()
+
+            if client:
+                # Активные счета
+                accounts = Account.objects.filter(client=client, status='active').order_by('-created_at')[:5]
+
+                # Активные кредиты
+                credits = Credit.objects.filter(client=client, status='active').order_by('-created_at')[:5]
+
+                # Активные депозиты
+                deposits = Deposit.objects.filter(client=client, status='active').order_by('-created_at')[:5]
+
+                # Общий баланс по всем счетам
+                total_balance = accounts.aggregate(total=Sum('balance'))['total'] or Decimal('0.00')
+
+                # Последние транзакции
+                account_ids = accounts.values_list('id', flat=True)
+                recent_transactions = Transaction.objects.filter(
+                    Q(from_account__in=account_ids) | Q(to_account__in=account_ids)
+                ).order_by('-created_at')[:10]
+
+                # Ближайшие платежи по кредитам
+                credit_ids = credits.values_list('id', flat=True)
+                credit_notifications = CreditPayment.objects.filter(
+                    credit_id__in=credit_ids,
+                    status='pending',
+                    due_date__gte=timezone.now().date()
+                ).order_by('due_date')[:5]
+
+                context.update({
+                    'client': client,
+                    'accounts': accounts,
+                    'credits': credits,
+                    'deposits': deposits,
+                    'total_balance': total_balance,
+                    'recent_transactions': recent_transactions,
+                    'credit_notifications': credit_notifications,
+                    'active_credits': credits,
+                    'products_count': {
+                        'accounts': accounts.count(),
+                        'credits': credits.count(),
+                        'deposits': deposits.count(),
+                        'total': accounts.count() + credits.count() + deposits.count()
+                    },
+                })
+
+            template = 'users/dashboard_client.html'
+
+        elif user.role in ['employee', 'admin']:
+            # Дашборд для сотрудника и администратора
+            Client = apps.get_model('clients', 'Client')
+            Account = apps.get_model('accounts', 'Account')
+            Transaction = apps.get_model('transactions', 'Transaction')
+            Credit = apps.get_model('credits', 'Credit')
+            CreditPayment = apps.get_model('credits', 'CreditPayment')
+
+            # Статистика
+            total_clients = Client.objects.count()
+            total_accounts = Account.objects.filter(status='active').count()
+            total_transactions = Transaction.objects.count()
+            total_balance_result = Account.objects.filter(
+                status='active'
+            ).aggregate(total=Sum('balance'))
+            total_balance = total_balance_result['total'] or Decimal('0.00')
+
+            # Статистика по кредитам
+            total_credits = Credit.objects.count()
+            active_credits = Credit.objects.filter(status='active').count()
+            overdue_credits = Credit.objects.filter(status='overdue').count()
+
+            # Ближайшие платежи
+            credit_notifications = CreditPayment.objects.filter(
+                status='pending',
+                due_date__gte=timezone.now().date()
+            ).order_by('due_date')[:5]
+
+            # Активные кредиты
+            active_credits_list = Credit.objects.filter(
+                status='active'
+            ).order_by('-created_at')[:5]
+
+            # Последние транзакции
+            recent_transactions = Transaction.objects.all().order_by('-created_at')[:10]
+
+            # Недавние клиенты
+            recent_clients = Client.objects.order_by('-created_at')[:5]
+
+            stats = {
+                'total_clients': total_clients,
+                'total_accounts': total_accounts,
+                'total_transactions': total_transactions,
+                'total_balance': total_balance,
+            }
+
+            credit_stats = {
+                'total_credits': total_credits,
+                'active_credits': active_credits,
+                'overdue_credits': overdue_credits,
+                'total_paid': 0,  # Здесь нужно добавить логику расчета
+                'total_debt': 0,  # Здесь нужно добавить логику расчета
+            }
 
             context.update({
-                'total_clients': Client.objects.count(),
-                'total_accounts': Account.objects.filter(status='active').count(),
-                'active_credits': Credit.objects.filter(status='active').count(),
-                'recent_clients': Client.objects.order_by('-created_at')[:5],
+                'stats': stats,
+                'credit_stats': credit_stats,
+                'credit_notifications': credit_notifications,
+                'active_credits': active_credits_list,
+                'recent_transactions': recent_transactions,
+                'recent_clients': recent_clients,
+                'notifications': [],  # Заглушка для уведомлений
             })
 
             if user.role == 'admin':
                 context['total_users'] = User.objects.count()
                 context['recent_users'] = User.objects.order_by('-date_joined')[:5]
 
-        except Exception as e:
-            messages.error(request, f'Ошибка загрузки данных: {str(e)}')
+            template = 'users/dashboard.html'  # Используем общий шаблон для сотрудников
 
-        template = 'users/dashboard_employee.html'
+        else:
+            # Дефолтный шаблон для других ролей
+            template = 'users/dashboard.html'
 
-    else:
+    except Exception as e:
+        messages.error(request, f'Ошибка загрузки данных: {str(e)}')
         template = 'users/dashboard.html'
 
     return render(request, template, context)
@@ -153,7 +243,8 @@ def profile_view(request):
     Просмотр и редактирование профиля пользователя
     """
     user = request.user
-    client = getattr(user, 'client_profile', None)
+    Client = apps.get_model('clients', 'Client')
+    client = Client.objects.filter(user=user).first()
 
     if request.method == 'POST':
         user.email = request.POST.get('email', user.email)

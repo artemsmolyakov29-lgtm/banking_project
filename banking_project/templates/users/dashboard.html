@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
 
 {% block title %}Главная панель{% endblock %}
 
@@ -12,7 +14,7 @@
         </div>
     </div>
 
-    <!-- НОВЫЙ БЛОК: Уведомления о предстоящих платежах -->
+    <!-- Уведомления о предстоящих платежах -->
     {% if credit_notifications %}
     <div class="alert alert-warning">
         <h5><i class="fas fa-exclamation-triangle me-2"></i>Предстоящие платежи по кредитам</h5>
@@ -31,13 +33,14 @@
     </div>
     {% endif %}
 
+    <!-- Статистика -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card bg-primary text-white">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4>{{ stats.total_clients }}</h4>
+                            <h4>{{ stats.total_clients|default:0|intcomma }}</h4>
                             <p class="mb-0">Клиентов</p>
                         </div>
                         <div class="align-self-center">
@@ -52,7 +55,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4>{{ stats.total_accounts }}</h4>
+                            <h4>{{ stats.total_accounts|default:0|intcomma }}</h4>
                             <p class="mb-0">Счетов</p>
                         </div>
                         <div class="align-self-center">
@@ -67,7 +70,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4>{{ stats.total_transactions }}</h4>
+                            <h4>{{ stats.total_transactions|default:0|intcomma }}</h4>
                             <p class="mb-0">Транзакций</p>
                         </div>
                         <div class="align-self-center">
@@ -82,7 +85,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4>{{ stats.total_balance }}</h4>
+                            <h4>{{ stats.total_balance|default:0|floatformat:2|intcomma }} ₽</h4>
                             <p class="mb-0">Общий баланс</p>
                         </div>
                         <div class="align-self-center">
@@ -94,7 +97,7 @@
         </div>
     </div>
 
-    <!-- НОВЫЙ БЛОК: Статистика по кредитам -->
+    <!-- Статистика по кредитам -->
     {% if credit_stats %}
     <div class="row mb-4">
         <div class="col-12">
@@ -105,23 +108,23 @@
                 <div class="card-body">
                     <div class="row text-center">
                         <div class="col-md-2">
-                            <h4>{{ credit_stats.total_credits }}</h4>
+                            <h4>{{ credit_stats.total_credits|default:0|intcomma }}</h4>
                             <small class="text-muted">Всего кредитов</small>
                         </div>
                         <div class="col-md-2">
-                            <h4 class="text-primary">{{ credit_stats.active_credits }}</h4>
+                            <h4 class="text-primary">{{ credit_stats.active_credits|default:0|intcomma }}</h4>
                             <small class="text-muted">Активных</small>
                         </div>
                         <div class="col-md-2">
-                            <h4 class="text-danger">{{ credit_stats.overdue_credits }}</h4>
+                            <h4 class="text-danger">{{ credit_stats.overdue_credits|default:0|intcomma }}</h4>
                             <small class="text-muted">Просроченных</small>
                         </div>
                         <div class="col-md-3">
-                            <h4 class="text-success">{{ credit_stats.total_paid }}</h4>
+                            <h4 class="text-success">{{ credit_stats.total_paid|default:0|floatformat:2|intcomma }} ₽</h4>
                             <small class="text-muted">Всего выплачено</small>
                         </div>
                         <div class="col-md-3">
-                            <h4 class="text-warning">{{ credit_stats.total_debt }}</h4>
+                            <h4 class="text-warning">{{ credit_stats.total_debt|default:0|floatformat:2|intcomma }} ₽</h4>
                             <small class="text-muted">Общий долг</small>
                         </div>
                     </div>
@@ -132,6 +135,7 @@
     {% endif %}
 
     <div class="row">
+        <!-- Последние транзакции -->
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
@@ -143,13 +147,13 @@
                         {% for transaction in recent_transactions %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="mb-1">{{ transaction.get_transaction_type_display }}</h6>
-                                <small class="text-muted">{{ transaction.description|truncatewords:3 }}</small>
+                                <h6 class="mb-1">{{ transaction.get_transaction_type_display|default:"Транзакция" }}</h6>
+                                <small class="text-muted">{{ transaction.description|truncatewords:3|default:"Без описания" }}</small>
                             </div>
                             <div class="text-end">
-                                <span class="fw-bold {% if transaction.transaction_type == 'deposit' or transaction.transaction_type == 'interest' %}text-success{% else %}text-danger{% endif %}">
-                                    {% if transaction.transaction_type == 'deposit' or transaction.transaction_type == 'interest' %}+{% else %}-{% endif %}
-                                    {{ transaction.amount }} {{ transaction.currency.code }}
+                                <span class="fw-bold {% if transaction.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if transaction.amount >= 0 %}+{% else %}-{% endif %}
+                                    {{ transaction.amount|default:0|floatformat:2|intcomma }} {{ transaction.currency.code|default:"₽" }}
                                 </span>
                                 <br>
                                 <small class="text-muted">{{ transaction.created_at|date:"d.m.Y H:i" }}</small>
@@ -167,6 +171,7 @@
             </div>
         </div>
 
+        <!-- Быстрые действия -->
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
@@ -190,7 +195,7 @@
                             </a>
                         </div>
                         <div class="col-6">
-                            <a href="{% url 'credits:credit_apply' %}" class="btn btn-outline-warning w-100 mb-2">
+                            <a href="{% url 'credits:credit_create' %}" class="btn btn-outline-warning w-100 mb-2">
                                 <i class="fas fa-credit-card"></i> Оформить кредит
                             </a>
                         </div>
@@ -200,7 +205,7 @@
                             </a>
                         </div>
                         <div class="col-6">
-                            <a href="{% url 'reports:report_dashboard' %}" class="btn btn-outline-dark w-100 mb-2">
+                            <a href="{% url 'reports:list' %}" class="btn btn-outline-dark w-100 mb-2">
                                 <i class="fas fa-chart-bar"></i> Отчеты
                             </a>
                         </div>
@@ -208,7 +213,7 @@
                 </div>
             </div>
 
-            <!-- НОВЫЙ БЛОК: Активные кредиты -->
+            <!-- Активные кредиты -->
             {% if active_credits %}
             <div class="card mt-4">
                 <div class="card-header">
@@ -219,12 +224,12 @@
                         {% for credit in active_credits %}
                         <div class="list-group-item">
                             <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ credit.contract_number }}</h6>
-                                <small>{{ credit.remaining_balance }} {{ credit.account.currency.code }}</small>
+                                <h6 class="mb-1">{{ credit.contract_number|default:"Без номера" }}</h6>
+                                <small>{{ credit.remaining_balance|default:0|floatformat:2|intcomma }} {{ credit.account.currency.code|default:"₽" }}</small>
                             </div>
-                            <p class="mb-1 small">Следующий платеж: {{ credit.next_payment_date|date:"d.m.Y" }}</p>
-                            <a href="{% url 'credits:credit_payment' credit.id %}" class="btn btn-sm btn-outline-primary">
-                                Оплатить
+                            <p class="mb-1 small">Следующий платеж: {{ credit.next_payment_date|date:"d.m.Y"|default:"Не указано" }}</p>
+                            <a href="{% url 'credits:credit_detail' credit.id %}" class="btn btn-sm btn-outline-primary">
+                                Детали
                             </a>
                         </div>
                         {% endfor %}
@@ -233,6 +238,7 @@
             </div>
             {% endif %}
 
+            <!-- Системные уведомления -->
             <div class="card mt-4">
                 <div class="card-header">
                     <h5 class="mb-0">Системные уведомления</h5>
@@ -243,10 +249,10 @@
                         {% for notification in notifications %}
                         <div class="list-group-item">
                             <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ notification.title }}</h6>
-                                <small class="text-muted">{{ notification.created_at|timesince }}</small>
+                                <h6 class="mb-1">{{ notification.title|default:"Уведомление" }}</h6>
+                                <small class="text-muted">{{ notification.created_at|timesince|default:"только что" }}</small>
                             </div>
-                            <p class="mb-1">{{ notification.message }}</p>
+                            <p class="mb-1">{{ notification.message|default:"Сообщение" }}</p>
                         </div>
                         {% endfor %}
                     </div>

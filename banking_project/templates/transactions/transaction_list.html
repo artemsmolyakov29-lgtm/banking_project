@@ -26,19 +26,19 @@
                     <label class="form-label">Тип</label>
                     <select class="form-select" name="transaction_type">
                         <option value="">Все типы</option>
-                        <option value="TRANSFER" {% if request.GET.transaction_type =='TRANSFER' %}selected{% endif %}>Перевод</option>
-                        <option value="PAYMENT" {% if request.GET.transaction_type =='PAYMENT' %}selected{% endif %}>Платеж</option>
-                        <option value="DEPOSIT" {% if request.GET.transaction_type =='DEPOSIT' %}selected{% endif %}>Пополнение</option>
-                        <option value="WITHDRAWAL" {% if request.GET.transaction_type =='WITHDRAWAL' %}selected{% endif %}>Снятие</option>
+                        <option value="TRANSFER" {% if request.GET.transaction_type == 'TRANSFER' %}selected{% endif %}>Перевод</option>
+                        <option value="PAYMENT" {% if request.GET.transaction_type == 'PAYMENT' %}selected{% endif %}>Платеж</option>
+                        <option value="DEPOSIT" {% if request.GET.transaction_type == 'DEPOSIT' %}selected{% endif %}>Пополнение</option>
+                        <option value="WITHDRAWAL" {% if request.GET.transaction_type == 'WITHDRAWAL' %}selected{% endif %}>Снятие</option>
                     </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Статус</label>
                     <select class="form-select" name="status">
                         <option value="">Все статусы</option>
-                        <option value="COMPLETED" {% if request.GET.status =='COMPLETED' %}selected{% endif %}>Завершена</option>
-                        <option value="PENDING" {% if request.GET.status =='PENDING' %}selected{% endif %}>В обработке</option>
-                        <option value="FAILED" {% if request.GET.status =='FAILED' %}selected{% endif %}>Ошибка</option>
+                        <option value="COMPLETED" {% if request.GET.status == 'COMPLETED' %}selected{% endif %}>Завершена</option>
+                        <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>В обработке</option>
+                        <option value="FAILED" {% if request.GET.status == 'FAILED' %}selected{% endif %}>Ошибка</option>
                     </select>
                 </div>
                 <div class="col-md-2">

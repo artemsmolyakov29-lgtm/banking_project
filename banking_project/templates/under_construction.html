@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}В разработке - Банковская система{% endblock %}
+
+{% block extra_css %}
+<style>
+    .construction-container {
+        min-height: calc(100vh - 300px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+    .construction-icon {
+        font-size: 5rem;
+        margin-bottom: 2rem;
+    }
+    .construction-title {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: #2c3e50;
+    }
+    .construction-text {
+        font-size: 1.2rem;
+        color: #7f8c8d;
+        margin-bottom: 2rem;
+        max-width: 600px;
+        text-align: center;
+    }
+    .progress-container {
+        max-width: 400px;
+        margin: 2rem auto;
+    }
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        text-align: left;
+        max-width: 400px;
+        margin: 0 auto 2rem;
+    }
+    .feature-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #eee;
+    }
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+    .feature-list li i {
+        margin-right: 1rem;
+        color: #3498db;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="construction-container">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 text-center">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body p-5">
+                        <!-- Иконка -->
+                        <div class="construction-icon">
+                            <i class="fas fa-tools text-warning"></i>
+                        </div>
+
+                        <!-- Заголовок -->
+                        <h1 class="construction-title">
+                            Раздел в разработке
+                        </h1>
+
+                        <!-- Описание -->
+                        <div class="construction-text">
+                            <p>
+                                Мы активно работаем над созданием этого раздела.
+                                В ближайшее время здесь появится новый функционал,
+                                который сделает работу с банковской системой еще удобнее.
+                            </p>
+                        </div>
+
+                        <!-- Прогресс -->
+                        <div class="progress-container">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Статус разработки</span>
+                                <span>75%</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                                     role="progressbar"
+                                     style="width: 75%"
+                                     aria-valuenow="75"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Список планируемых функций -->
+                        <div class="mt-4">
+                            <h5 class="mb-3 text-muted">Планируемый функционал:</h5>
+                            <ul class="feature-list">
+                                <li>
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    Удобный интерфейс управления
+                                </li>
+                                <li>
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    Быстрые операции
+                                </li>
+                                <li>
+                                    <i class="fas fa-spinner text-warning"></i>
+                                    Расширенная аналитика
+                                </li>
+                                <li>
+                                    <i class="fas fa-clock text-info"></i>
+                                    Автоматические отчеты
+                                </li>
+                                <li>
+                                    <i class="fas fa-clock text-info"></i>
+                                    Мобильная версия
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Кнопки -->
+                        <div class="mt-4">
+                            <a href="{% url 'users:dashboard' %}" class="btn btn-primary btn-lg me-3">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Вернуться в личный кабинет
+                            </a>
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-home me-2"></i>
+                                На главную
+                            </a>
+                        </div>
+
+                        <!-- Контактная информация -->
+                        <div class="mt-5 pt-4 border-top">
+                            <p class="text-muted mb-2">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Если вам срочно нужен этот функционал, свяжитесь с поддержкой
+                            </p>
+                            <a href="mailto:support@banking-project.com" class="btn btn-outline-info">
+                                <i class="fas fa-envelope me-2"></i>
+                                Написать в поддержку
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Анимация прогресс-бара
+        const progressBar = document.querySelector('.progress-bar');
+        let width = 0;
+        const targetWidth = 75;
+        const interval = setInterval(() => {
+            if (width >= targetWidth) {
+                clearInterval(interval);
+            } else {
+                width++;
+                progressBar.style.width = width + '%';
+                progressBar.setAttribute('aria-valuenow', width);
+            }
+        }, 20);
+
+        // Обновление даты следующего релиза
+        const nextRelease = document.getElementById('next-release');
+        if (nextRelease) {
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            nextRelease.textContent = nextWeek.toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+    });
+</script>
+{% endblock %}

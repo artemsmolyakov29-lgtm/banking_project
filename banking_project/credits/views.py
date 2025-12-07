@@ -94,13 +94,29 @@ class CreditListView(LoginRequiredMixin, ListView):
 
         if self.request.user.role == 'client':
             # Клиенты видят только свои кредиты
-            client = get_object_or_404(Client, user=self.request.user)
-            credits = client.credits.all()
+            try:
+                client = Client.objects.get(user=self.request.user)
+                credits = client.credits.all()
+            except Client.DoesNotExist:
+                # Если клиент не найден, возвращаем пустой queryset
+                credits = Credit.objects.none()
+                messages.warning(self.request, 'Клиентский профиль не найден')
         else:
             # Сотрудники и админы видят все кредиты
             credits = Credit.objects.all()
 
         return credits.select_related('client', 'client__user').order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['user_role'] = self.request.user.role
+
+        if self.request.user.role == 'client':
+            context['page_title'] = 'Мои кредиты'
+        else:
+            context['page_title'] = 'Все кредиты'
+
+        return context
 
 
 class CreditDetailView(LoginRequiredMixin, DetailView):
@@ -113,32 +129,59 @@ class CreditDetailView(LoginRequiredMixin, DetailView):
         Client = get_client_model()
 
         if self.request.user.role == 'client':
-            client = get_object_or_404(Client, user=self.request.user)
-            return Credit.objects.filter(client=client).select_related('client', 'client__user')
+            try:
+                client = Client.objects.get(user=self.request.user)
+                return Credit.objects.filter(client=client).select_related('client', 'client__user')
+            except Client.DoesNotExist:
+                return Credit.objects.none()
         return Credit.objects.all().select_related('client', 'client__user')
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        credit = self.object
-
-        # Добавляем информацию о следующем платеже
-        context['next_payment_amount'] = credit.calculate_next_payment()
-        context['penalty_amount'] = credit.calculate_penalty()
-        context['total_due'] = context['next_payment_amount'] + context['penalty_amount']
-        context['can_early_repay'] = credit.can_make_early_repayment()
-        context['early_repayment_amount'] = credit.calculate_early_repayment()
-
-        # Последние 5 платежей
-        context['recent_payments'] = credit.payments.all().order_by('-payment_date')[:5]
-
-        return context
-
     def get(self, request, *args, **kwargs):
-        credit = self.get_object()
+        try:
+            credit = self.get_object()
+        except:
+            messages.error(request, 'Кредит не найден')
+            return redirect('credits:credit_list')
+
         if request.user.role == 'client' and credit.client.user != request.user:
             messages.error(request, 'У вас нет доступа к этому кредиту')
             return redirect('credits:credit_list')
         return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        credit = context['credit']
+
+        # Добавляем информацию о следующем платеже, если методы существуют
+        try:
+            context['next_payment_amount'] = credit.calculate_next_payment()
+        except:
+            context['next_payment_amount'] = Decimal('0.00')
+
+        try:
+            context['penalty_amount'] = credit.calculate_penalty()
+        except:
+            context['penalty_amount'] = Decimal('0.00')
+
+        context['total_due'] = context['next_payment_amount'] + context['penalty_amount']
+
+        try:
+            context['can_early_repay'] = credit.can_make_early_repayment()
+        except:
+            context['can_early_repay'] = False
+
+        try:
+            context['early_repayment_amount'] = credit.calculate_early_repayment()
+        except:
+            context['early_repayment_amount'] = Decimal('0.00')
+
+        # Последние 5 платежей
+        if hasattr(credit, 'payments'):
+            context['recent_payments'] = credit.payments.all().order_by('-payment_date')[:5]
+        else:
+            context['recent_payments'] = []
+
+        return context
 
 
 class CreditCreateView(LoginRequiredMixin, RoleRequiredMixin, CreateView):
@@ -206,12 +249,24 @@ class CreditDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
 def credit_payment_view(request, pk):
     """Внесение платежа по кредиту"""
     Credit = get_credit_model()
-    credit = get_object_or_404(Credit, pk=pk)
+
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
+        return redirect('credits:credit_list')
 
     # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому кредиту')
-        return redirect('credits:credit_list')
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к этому кредиту')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
 
     if request.method == 'POST':
         from .forms import CreditPaymentForm
@@ -227,12 +282,23 @@ def credit_payment_view(request, pk):
         from .forms import CreditPaymentForm
         form = CreditPaymentForm(credit=credit, user=request.user)
 
+    # Расчет сумм с обработкой исключений
+    try:
+        next_payment_amount = credit.calculate_next_payment()
+    except:
+        next_payment_amount = Decimal('0.00')
+
+    try:
+        penalty_amount = credit.calculate_penalty()
+    except:
+        penalty_amount = Decimal('0.00')
+
     return render(request, 'credits/credit_payment.html', {
         'credit': credit,
         'form': form,
-        'next_payment_amount': credit.calculate_next_payment(),
-        'penalty_amount': credit.calculate_penalty(),
-        'total_due': credit.calculate_next_payment() + credit.calculate_penalty()
+        'next_payment_amount': next_payment_amount,
+        'penalty_amount': penalty_amount,
+        'total_due': next_payment_amount + penalty_amount
     })
 
 
@@ -240,15 +306,32 @@ def credit_payment_view(request, pk):
 def early_repayment_view(request, pk):
     """Досрочное погашение кредита"""
     Credit = get_credit_model()
-    credit = get_object_or_404(Credit, pk=pk)
 
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому кредиту')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к этому кредиту')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
     # Проверка возможности досрочного погашения
-    if not credit.can_make_early_repayment():
+    try:
+        can_early_repay = credit.can_make_early_repayment()
+    except:
+        can_early_repay = False
+
+    if not can_early_repay:
         messages.error(request, 'Досрочное погашение для этого кредита не разрешено')
         return redirect('credits:credit_detail', pk=credit.pk)
 
@@ -266,10 +349,16 @@ def early_repayment_view(request, pk):
         from .forms import EarlyRepaymentForm
         form = EarlyRepaymentForm(credit=credit, user=request.user)
 
+    # Расчет суммы досрочного погашения
+    try:
+        early_repayment_amount = credit.calculate_early_repayment()
+    except:
+        early_repayment_amount = Decimal('0.00')
+
     return render(request, 'credits/early_repayment.html', {
         'credit': credit,
         'form': form,
-        'early_repayment_amount': credit.calculate_early_repayment()
+        'early_repayment_amount': early_repayment_amount
     })
 
 
@@ -279,14 +368,29 @@ def payment_history_view(request, pk):
     Credit = get_credit_model()
     CreditPayment = get_credit_payment_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к платежам этого кредита')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
-    payments = credit.payments.all().select_related('transaction').order_by('-payment_date')
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к платежам этого кредита')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
+    # Получаем платежи с проверкой существования отношения
+    if hasattr(credit, 'payments'):
+        payments = credit.payments.all().order_by('-payment_date')
+    else:
+        payments = CreditPayment.objects.filter(credit=credit).order_by('-payment_date')
 
     # Фильтрация
     status_filter = request.GET.get('status')
@@ -319,17 +423,33 @@ def payment_history_view(request, pk):
 def payment_schedule_view(request, pk):
     """График платежей по кредиту с фильтрацией"""
     Credit = get_credit_model()
-    credit = get_object_or_404(Credit, pk=pk)
+
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
+        return redirect('credits:credit_list')
 
     # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к графику платежей этого кредита')
-        return redirect('credits:credit_list')
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к графику платежей этого кредита')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
 
     from .forms import PaymentScheduleFilterForm
     form = PaymentScheduleFilterForm(request.GET or None)
 
-    schedule = credit.generate_payment_schedule() if hasattr(credit, 'generate_payment_schedule') else []
+    # Генерация графика платежей с проверкой метода
+    if hasattr(credit, 'generate_payment_schedule'):
+        schedule = credit.generate_payment_schedule()
+    else:
+        schedule = []
 
     # Применяем фильтры к графику
     filtered_schedule = schedule
@@ -339,14 +459,17 @@ def payment_schedule_view(request, pk):
         status_filter = form.cleaned_data.get('status')
 
         if date_from:
-            filtered_schedule = [p for p in filtered_schedule if p['payment_date'] >= date_from]
+            filtered_schedule = [p for p in filtered_schedule if
+                                 p.get('payment_date', datetime.now().date()) >= date_from]
         if date_to:
-            filtered_schedule = [p for p in filtered_schedule if p['payment_date'] <= date_to]
+            filtered_schedule = [p for p in filtered_schedule if
+                                 p.get('payment_date', datetime.now().date()) <= date_to]
 
         # Для статуса используем реальные платежи
         if status_filter:
-            actual_payments = credit.payments.filter(status=status_filter).values_list('payment_number', flat=True)
-            filtered_schedule = [p for p in filtered_schedule if p['payment_number'] in actual_payments]
+            if hasattr(credit, 'payments'):
+                actual_payments = credit.payments.filter(status=status_filter).values_list('payment_number', flat=True)
+                filtered_schedule = [p for p in filtered_schedule if p.get('payment_number', 0) in actual_payments]
 
     return render(request, 'credits/payment_schedule.html', {
         'credit': credit,
@@ -360,15 +483,31 @@ def payment_schedule_view(request, pk):
 def payment_success(request, pk):
     """Страница успешного платежа"""
     Credit = get_credit_model()
-    credit = get_object_or_404(Credit, pk=pk)
 
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому кредиту')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к этому кредиту')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
     # Получаем последний платеж
-    last_payment = credit.payments.last()
+    if hasattr(credit, 'payments'):
+        last_payment = credit.payments.last()
+    else:
+        CreditPayment = get_credit_payment_model()
+        last_payment = CreditPayment.objects.filter(credit=credit).last()
 
     return render(request, 'credits/payment_success.html', {
         'credit': credit,
@@ -380,40 +519,66 @@ def payment_success(request, pk):
 def calculate_penalty_view(request, pk):
     """Расчет штрафов за просрочку"""
     Credit = get_credit_model()
-    credit = get_object_or_404(Credit, pk=pk)
 
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому кредиту')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
-    penalty_amount = credit.calculate_penalty()
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к этому кредиту')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
+    # Расчет штрафов с проверкой атрибутов
+    try:
+        penalty_amount = credit.calculate_penalty()
+    except:
+        penalty_amount = Decimal('0.00')
+
+    overdue_days = getattr(credit, 'overdue_days', 0)
+    overdue_amount = getattr(credit, 'overdue_amount', Decimal('0.00'))
 
     return render(request, 'credits/calculate_penalty.html', {
         'credit': credit,
         'penalty_amount': penalty_amount,
-        'overdue_days': credit.overdue_days,
-        'overdue_amount': credit.overdue_amount
+        'overdue_days': overdue_days,
+        'overdue_amount': overdue_amount
     })
 
 
-# Существующие функциональные представления (оставляем без изменений)
+# Существующие функциональные представления
+
 @login_required
 def credit_list_old(request):
     """Список кредитов - старая версия"""
-    User = get_user_model()
-    Client = get_client_model()
     Credit = get_credit_model()
+    Client = get_client_model()
 
     if request.user.role == 'client':
         # Клиенты видят только свои кредиты
-        client = get_object_or_404(Client, user=request.user)
-        credits = client.credits.all()
+        try:
+            client = Client.objects.get(user=request.user)
+            credits = client.credits.all()
+        except Client.DoesNotExist:
+            credits = Credit.objects.none()
+            messages.warning(request, 'Клиентский профиль не найден')
     else:
         # Сотрудники и админы видят все кредиты
         credits = Credit.objects.all()
 
-    return render(request, 'credits/credit_list.html', {'credits': credits})
+    return render(request, 'credits/credit_list.html', {
+        'credits': credits,
+        'user_role': request.user.role
+    })
 
 
 @login_required
@@ -421,7 +586,10 @@ def credit_products(request):
     """Список кредитных продуктов"""
     CreditProduct = get_credit_product_model()
     products = CreditProduct.objects.filter(is_active=True)
-    return render(request, 'credits/credit_products.html', {'products': products})
+    return render(request, 'credits/credit_products.html', {
+        'products': products,
+        'user_role': request.user.role
+    })
 
 
 @login_required
@@ -431,7 +599,11 @@ def credit_apply(request):
     CreditProduct = get_credit_product_model()
 
     if request.user.role == 'client':
-        client = get_object_or_404(Client, user=request.user)
+        try:
+            client = Client.objects.get(user=request.user)
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
     else:
         client = None
 
@@ -443,7 +615,8 @@ def credit_apply(request):
     products = CreditProduct.objects.filter(is_active=True)
     return render(request, 'credits/credit_apply.html', {
         'client': client,
-        'products': products
+        'products': products,
+        'user_role': request.user.role
     })
 
 
@@ -452,21 +625,33 @@ def credit_detail_old(request, pk):
     """Детальная информация о кредите - старая версия"""
     Credit = get_credit_model()
     Client = get_client_model()
-    User = get_user_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому кредиту')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к этому кредиту')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
     # Расчет графика платежей
-    payment_schedule = credit.generate_payment_schedule() if hasattr(credit, 'generate_payment_schedule') else []
+    payment_schedule = []
+    if hasattr(credit, 'generate_payment_schedule'):
+        payment_schedule = credit.generate_payment_schedule()
 
     return render(request, 'credits/credit_detail.html', {
         'credit': credit,
-        'payment_schedule': payment_schedule
+        'payment_schedule': payment_schedule,
+        'user_role': request.user.role
     })
 
 
@@ -474,19 +659,36 @@ def credit_detail_old(request, pk):
 def credit_payments(request, pk):
     """Платежи по кредиту"""
     Credit = get_credit_model()
-    CreditPayment = get_credit_payment_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к платежам этого кредита')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
-    payments = credit.payments.all()
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к платежам этого кредита')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
+    # Получаем платежи
+    if hasattr(credit, 'payments'):
+        payments = credit.payments.all()
+    else:
+        CreditPayment = get_credit_payment_model()
+        payments = CreditPayment.objects.filter(credit=credit)
+
     return render(request, 'credits/credit_payments.html', {
         'credit': credit,
-        'payments': payments
+        'payments': payments,
+        'user_role': request.user.role
     })
 
 
@@ -494,15 +696,25 @@ def credit_payments(request, pk):
 def credit_payment_old(request, pk):
     """Внесение платежа по кредиту - старая версия"""
     Credit = get_credit_model()
-    CreditPayment = get_credit_payment_model()
     Account = get_account_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
+        return redirect('credits:credit_list')
 
     # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому кредиту')
-        return redirect('credits:credit_list')
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к этому кредиту')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
 
     if request.method == 'POST':
         amount = request.POST.get('amount')
@@ -510,7 +722,10 @@ def credit_payment_old(request, pk):
         messages.success(request, f'Платеж на сумму {amount} успешно внесен')
         return redirect('credits:credit_detail', pk=credit.pk)
 
-    return render(request, 'credits/credit_payment_form.html', {'credit': credit})
+    return render(request, 'credits/credit_payment_form.html', {
+        'credit': credit,
+        'user_role': request.user.role
+    })
 
 
 @login_required
@@ -518,18 +733,34 @@ def credit_schedule(request, pk):
     """График платежей по кредиту"""
     Credit = get_credit_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and credit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к графику платежей этого кредита')
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
         return redirect('credits:credit_list')
 
-    schedule = credit.generate_payment_schedule() if hasattr(credit, 'generate_payment_schedule') else []
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            Client = get_client_model()
+            client = Client.objects.get(user=request.user)
+            if credit.client != client:
+                messages.error(request, 'У вас нет доступа к графику платежей этого кредита')
+                return redirect('credits:credit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('credits:credit_list')
+
+    # Генерация графика платежей
+    if hasattr(credit, 'generate_payment_schedule'):
+        schedule = credit.generate_payment_schedule()
+    else:
+        schedule = []
 
     return render(request, 'credits/credit_schedule.html', {
         'credit': credit,
-        'schedule': schedule
+        'schedule': schedule,
+        'user_role': request.user.role
     })
 
 
@@ -539,8 +770,17 @@ def credit_collaterals(request, pk):
     """Залоговое имущество по кредиту"""
     Credit = get_credit_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
-    collaterals = credit.collaterals.all() if hasattr(credit, 'collaterals') else []
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
+        return redirect('credits:credit_list')
+
+    # Получаем залоги
+    if hasattr(credit, 'collaterals'):
+        collaterals = credit.collaterals.all()
+    else:
+        collaterals = []
 
     return render(request, 'credits/credit_collaterals.html', {
         'credit': credit,
@@ -553,9 +793,12 @@ def credit_collaterals(request, pk):
 def credit_approve(request, pk):
     """Одобрение кредита сотрудником"""
     Credit = get_credit_model()
-    User = get_user_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
+        return redirect('credits:credit_list')
 
     if request.method == 'POST':
         credit.status = 'approved'
@@ -573,7 +816,11 @@ def credit_reject(request, pk):
     """Отклонение кредита сотрудником"""
     Credit = get_credit_model()
 
-    credit = get_object_or_404(Credit, pk=pk)
+    try:
+        credit = Credit.objects.get(pk=pk)
+    except Credit.DoesNotExist:
+        messages.error(request, 'Кредит не найден')
+        return redirect('credits:credit_list')
 
     if request.method == 'POST':
         reason = request.POST.get('reason', '')

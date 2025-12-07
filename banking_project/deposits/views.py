@@ -90,8 +90,13 @@ class DepositListView(LoginRequiredMixin, ListView):
         Client = get_client_model()
 
         if self.request.user.role == 'client':
-            client = get_object_or_404(Client, user=self.request.user)
-            deposits = client.deposits.all()
+            # Клиенты видят только свои депозиты
+            try:
+                client = Client.objects.get(user=self.request.user)
+                deposits = client.deposits.all()
+            except Client.DoesNotExist:
+                deposits = Deposit.objects.none()
+                messages.warning(self.request, 'Клиентский профиль не найден')
         else:
             deposits = Deposit.objects.all()
 
@@ -99,14 +104,31 @@ class DepositListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['user_role'] = self.request.user.role
+
+        if self.request.user.role == 'client':
+            context['page_title'] = 'Мои депозиты'
+        else:
+            context['page_title'] = 'Все депозиты'
 
         # Добавляем информацию о процентах для сотрудников и админов
         if self.request.user.role in ['employee', 'admin']:
             deposits = context['deposits']
             for deposit in deposits:
-                deposit.expected_interest = deposit.get_expected_interest()
-                deposit.next_accrual_date = deposit.get_next_accrual_date()
-                deposit.total_accrued_interest = deposit.get_total_accrued_interest()
+                try:
+                    deposit.expected_interest = deposit.get_expected_interest()
+                except:
+                    deposit.expected_interest = Decimal('0.00')
+
+                try:
+                    deposit.next_accrual_date = deposit.get_next_accrual_date()
+                except:
+                    deposit.next_accrual_date = None
+
+                try:
+                    deposit.total_accrued_interest = deposit.get_total_accrued_interest()
+                except:
+                    deposit.total_accrued_interest = Decimal('0.00')
 
         return context
 
@@ -121,13 +143,21 @@ class DepositDetailView(LoginRequiredMixin, DetailView):
         Client = get_client_model()
 
         if self.request.user.role == 'client':
-            client = get_object_or_404(Client, user=self.request.user)
-            return Deposit.objects.filter(client=client).select_related('client', 'client__user', 'account',
-                                                                        'account__currency')
+            try:
+                client = Client.objects.get(user=self.request.user)
+                return Deposit.objects.filter(client=client).select_related('client', 'client__user', 'account',
+                                                                            'account__currency')
+            except Client.DoesNotExist:
+                return Deposit.objects.none()
         return Deposit.objects.all().select_related('client', 'client__user', 'account', 'account__currency')
 
     def get(self, request, *args, **kwargs):
-        deposit = self.get_object()
+        try:
+            deposit = self.get_object()
+        except:
+            messages.error(request, 'Депозит не найден')
+            return redirect('deposits:deposit_list')
+
         if request.user.role == 'client' and deposit.client.user != request.user:
             messages.error(request, 'У вас нет доступа к этому депозиту')
             return redirect('deposits:deposit_list')
@@ -137,12 +167,31 @@ class DepositDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         deposit = context['deposit']
 
-        # Добавляем информацию о процентах
-        context['expected_interest'] = deposit.get_expected_interest()
-        context['next_accrual_date'] = deposit.get_next_accrual_date()
-        context['total_accrued_interest'] = deposit.get_total_accrued_interest()
-        context['interest_history'] = deposit.get_interest_history()[:10]  # Последние 10 начислений
-        context['can_accrue_interest'] = deposit.can_accrue_interest()
+        # Добавляем информацию о процентах с обработкой исключений
+        try:
+            context['expected_interest'] = deposit.get_expected_interest()
+        except:
+            context['expected_interest'] = Decimal('0.00')
+
+        try:
+            context['next_accrual_date'] = deposit.get_next_accrual_date()
+        except:
+            context['next_accrual_date'] = None
+
+        try:
+            context['total_accrued_interest'] = deposit.get_total_accrued_interest()
+        except:
+            context['total_accrued_interest'] = Decimal('0.00')
+
+        try:
+            context['interest_history'] = deposit.get_interest_history()[:10]  # Последние 10 начислений
+        except:
+            context['interest_history'] = []
+
+        try:
+            context['can_accrue_interest'] = deposit.can_accrue_interest()
+        except:
+            context['can_accrue_interest'] = False
 
         return context
 
@@ -206,23 +255,30 @@ class DepositDeleteView(LoginRequiredMixin, RoleRequiredMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
-# Существующие функциональные представления (оставляем без изменений)
+# Существующие функциональные представления
+
 @login_required
 def deposit_list_old(request):
     """Список депозитов - старая версия"""
-    User = get_user_model()
-    Client = get_client_model()
     Deposit = get_deposit_model()
+    Client = get_client_model()
 
     if request.user.role == 'client':
         # Клиенты видят только свои депозиты
-        client = get_object_or_404(Client, user=request.user)
-        deposits = client.deposits.all()
+        try:
+            client = Client.objects.get(user=request.user)
+            deposits = client.deposits.all()
+        except Client.DoesNotExist:
+            deposits = Deposit.objects.none()
+            messages.warning(request, 'Клиентский профиль не найден')
     else:
         # Сотрудники и админы видят все депозиты
         deposits = Deposit.objects.all()
 
-    return render(request, 'deposits/deposit_list.html', {'deposits': deposits})
+    return render(request, 'deposits/deposit_list.html', {
+        'deposits': deposits,
+        'user_role': request.user.role
+    })
 
 
 @login_required
@@ -230,11 +286,14 @@ def deposit_open(request):
     """Открытие нового депозита"""
     Client = get_client_model()
     Deposit = get_deposit_model()
-    Account = get_account_model()
     Currency = get_currency_model()
 
     if request.user.role == 'client':
-        client = get_object_or_404(Client, user=request.user)
+        try:
+            client = Client.objects.get(user=request.user)
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('deposits:deposit_list')
     else:
         client = None
 
@@ -246,7 +305,8 @@ def deposit_open(request):
     currencies = Currency.objects.filter(is_active=True)
     return render(request, 'deposits/deposit_open.html', {
         'client': client,
-        'currencies': currencies
+        'currencies': currencies,
+        'user_role': request.user.role
     })
 
 
@@ -255,23 +315,40 @@ def deposit_detail_old(request, pk):
     """Детальная информация о депозите - старая версия"""
     Deposit = get_deposit_model()
     Client = get_client_model()
-    User = get_user_model()
 
-    deposit = get_object_or_404(Deposit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and deposit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому депозиту')
+    try:
+        deposit = Deposit.objects.get(pk=pk)
+    except Deposit.DoesNotExist:
+        messages.error(request, 'Депозит не найден')
         return redirect('deposits:deposit_list')
 
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            client = Client.objects.get(user=request.user)
+            if deposit.client != client:
+                messages.error(request, 'У вас нет доступа к этому депозиту')
+                return redirect('deposits:deposit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('deposits:deposit_list')
+
     # Расчет начисленных процентов
-    interest = deposit.calculate_interest() if hasattr(deposit, 'calculate_interest') else 0
-    total_amount = deposit.get_total_amount() if hasattr(deposit, 'get_total_amount') else deposit.amount
+    try:
+        interest = deposit.calculate_interest()
+    except:
+        interest = Decimal('0.00')
+
+    try:
+        total_amount = deposit.get_total_amount()
+    except:
+        total_amount = deposit.amount
 
     return render(request, 'deposits/deposit_detail.html', {
         'deposit': deposit,
         'interest': interest,
-        'total_amount': total_amount
+        'total_amount': total_amount,
+        'user_role': request.user.role
     })
 
 
@@ -281,21 +358,41 @@ def deposit_close(request, pk):
     Deposit = get_deposit_model()
     Client = get_client_model()
 
-    deposit = get_object_or_404(Deposit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and deposit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к этому депозиту')
+    try:
+        deposit = Deposit.objects.get(pk=pk)
+    except Deposit.DoesNotExist:
+        messages.error(request, 'Депозит не найден')
         return redirect('deposits:deposit_list')
 
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            client = Client.objects.get(user=request.user)
+            if deposit.client != client:
+                messages.error(request, 'У вас нет доступа к этому депозиту')
+                return redirect('deposits:deposit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('deposits:deposit_list')
+
     if request.method == 'POST':
-        if deposit.close_deposit():
-            messages.success(request, 'Депозит успешно закрыт')
+        if hasattr(deposit, 'close_deposit'):
+            if deposit.close_deposit():
+                messages.success(request, 'Депозит успешно закрыт')
+            else:
+                messages.error(request, 'Не удалось закрыть депозит')
         else:
-            messages.error(request, 'Не удалось закрыть депозит')
+            deposit.status = 'closed'
+            deposit.closed_at = timezone.now()
+            deposit.save()
+            messages.success(request, 'Депозит успешно закрыт')
+
         return redirect('deposits:deposit_detail', pk=deposit.pk)
 
-    return render(request, 'deposits/deposit_confirm_close.html', {'deposit': deposit})
+    return render(request, 'deposits/deposit_confirm_close.html', {
+        'deposit': deposit,
+        'user_role': request.user.role
+    })
 
 
 @login_required
@@ -304,20 +401,39 @@ def deposit_interest(request, pk):
     Deposit = get_deposit_model()
     Client = get_client_model()
 
-    deposit = get_object_or_404(Deposit, pk=pk)
-
-    # Проверка прав доступа
-    if request.user.role == 'client' and deposit.client.user != request.user:
-        messages.error(request, 'У вас нет доступа к процентам этого депозита')
+    try:
+        deposit = Deposit.objects.get(pk=pk)
+    except Deposit.DoesNotExist:
+        messages.error(request, 'Депозит не найден')
         return redirect('deposits:deposit_list')
 
-    interest_payments = deposit.interest_payments.all() if hasattr(deposit, 'interest_payments') else []
-    current_interest = deposit.calculate_interest() if hasattr(deposit, 'calculate_interest') else 0
+    # Проверка прав доступа
+    if request.user.role == 'client':
+        try:
+            client = Client.objects.get(user=request.user)
+            if deposit.client != client:
+                messages.error(request, 'У вас нет доступа к процентам этого депозита')
+                return redirect('deposits:deposit_list')
+        except Client.DoesNotExist:
+            messages.error(request, 'Клиентский профиль не найден')
+            return redirect('deposits:deposit_list')
+
+    # Получаем историю начисления процентов
+    if hasattr(deposit, 'interest_payments'):
+        interest_payments = deposit.interest_payments.all()
+    else:
+        interest_payments = []
+
+    try:
+        current_interest = deposit.calculate_interest()
+    except:
+        current_interest = Decimal('0.00')
 
     return render(request, 'deposits/deposit_interest.html', {
         'deposit': deposit,
         'interest_payments': interest_payments,
-        'current_interest': current_interest
+        'current_interest': current_interest,
+        'user_role': request.user.role
     })
 
 
@@ -327,35 +443,54 @@ def deposit_early_close(request, pk):
     """Досрочное закрытие депозита сотрудником"""
     Deposit = get_deposit_model()
 
-    deposit = get_object_or_404(Deposit, pk=pk)
+    try:
+        deposit = Deposit.objects.get(pk=pk)
+    except Deposit.DoesNotExist:
+        messages.error(request, 'Депозит не найден')
+        return redirect('deposits:deposit_list')
 
     if request.method == 'POST':
         # Здесь будет логика досрочного закрытия с пересчетом процентов
-        if deposit.close_deposit():
-            messages.success(request, 'Депозит досрочно закрыт')
+        if hasattr(deposit, 'close_deposit'):
+            if deposit.close_deposit():
+                messages.success(request, 'Депозит досрочно закрыт')
+            else:
+                messages.error(request, 'Не удалось закрыть депозит')
         else:
-            messages.error(request, 'Не удалось закрыть депозит')
+            deposit.status = 'closed'
+            deposit.closed_at = timezone.now()
+            deposit.save()
+            messages.success(request, 'Депозит досрочно закрыт')
+
         return redirect('deposits:deposit_detail', pk=deposit.pk)
 
-    return render(request, 'deposits/deposit_early_close.html', {'deposit': deposit})
+    return render(request, 'deposits/deposit_early_close.html', {
+        'deposit': deposit,
+        'user_role': request.user.role
+    })
 
 
 # Новые представления для начисления процентов
+
 @login_required
 @employee_required
 def accrue_interest_manual(request, pk):
     """Ручное начисление процентов по депозиту"""
     Deposit = get_deposit_model()
 
-    deposit = get_object_or_404(Deposit, pk=pk)
+    try:
+        deposit = Deposit.objects.get(pk=pk)
+    except Deposit.DoesNotExist:
+        messages.error(request, 'Депозит не найден')
+        return redirect('deposits:deposit_list')
 
-    if not deposit.can_accrue_interest():
+    if not hasattr(deposit, 'can_accrue_interest') or not deposit.can_accrue_interest():
         messages.error(request, 'Невозможно начислить проценты по этому депозиту')
         return redirect('deposits:deposit_detail', pk=deposit.pk)
 
     if request.method == 'POST':
         try:
-            # Используем management command для начисления
+            # Пытаемся использовать management command для начисления
             from django.core.management import call_command
             from django.core.management.base import CommandError
 
@@ -368,6 +503,8 @@ def accrue_interest_manual(request, pk):
 
             except CommandError as e:
                 messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
+            except Exception as e:
+                messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
 
             return redirect('deposits:deposit_detail', pk=deposit.pk)
 
@@ -375,7 +512,10 @@ def accrue_interest_manual(request, pk):
             messages.error(request, f'Ошибка при начислении процентов: {str(e)}')
 
     # Расчет ожидаемых процентов для отображения
-    expected_interest = deposit.get_expected_interest()
+    try:
+        expected_interest = deposit.get_expected_interest()
+    except:
+        expected_interest = Decimal('0.00')
 
     return render(request, 'deposits/deposit_accrue_interest.html', {
         'deposit': deposit,
@@ -426,13 +566,25 @@ def get_expected_interest(request, pk):
     """API для получения ожидаемых процентов"""
     Deposit = get_deposit_model()
 
-    deposit = get_object_or_404(Deposit, pk=pk)
-    expected_interest = deposit.get_expected_interest()
+    try:
+        deposit = Deposit.objects.get(pk=pk)
+    except Deposit.DoesNotExist:
+        return JsonResponse({'error': 'Депозит не найден'}, status=404)
+
+    try:
+        expected_interest = deposit.get_expected_interest()
+    except:
+        expected_interest = Decimal('0.00')
+
+    try:
+        next_accrual_date = deposit.get_next_accrual_date()
+    except:
+        next_accrual_date = None
 
     return JsonResponse({
         'expected_interest': float(expected_interest),
-        'currency': deposit.account.currency.code,
-        'next_accrual_date': deposit.get_next_accrual_date().isoformat() if deposit.get_next_accrual_date() else None
+        'currency': deposit.account.currency.code if deposit.account and deposit.account.currency else 'RUB',
+        'next_accrual_date': next_accrual_date.isoformat() if next_accrual_date else None
     })
 
 
@@ -440,7 +592,11 @@ def get_expected_interest(request, pk):
 @employee_required
 def interest_accrual_report(request):
     """Отчет по начисленным процентам"""
-    DepositInterestPayment = apps.get_model('deposits', 'DepositInterestPayment')
+    try:
+        DepositInterestPayment = apps.get_model('deposits', 'DepositInterestPayment')
+    except:
+        messages.error(request, 'Модель DepositInterestPayment не найдена')
+        return redirect('deposits:deposit_list')
 
     # Фильтры
     date_from = request.GET.get('date_from')

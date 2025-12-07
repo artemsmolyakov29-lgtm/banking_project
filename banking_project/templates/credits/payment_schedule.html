@@ -39,9 +39,9 @@
                                 <label class="form-label">Статус</label>
                                 <select name="status" class="form-select">
                                     <option value="">Все статусы</option>
-                                    <option value="pending" {% if form.status.value =='pending' %}selected{% endif %}>Ожидающие</option>
-                                    <option value="completed" {% if form.status.value =='completed' %}selected{% endif %}>Выполненные</option>
-                                    <option value="failed" {% if form.status.value =='failed' %}selected{% endif %}>Неуспешные</option>
+                                    <option value="pending" {% if form.status.value == 'pending' %}selected{% endif %}>Ожидающие</option>
+                                    <option value="completed" {% if form.status.value == 'completed' %}selected{% endif %}>Выполненные</option>
+                                    <option value="failed" {% if form.status.value == 'failed' %}selected{% endif %}>Неуспешные</option>
                                 </select>
                             </div>
                             <div class="col-md-3 d-flex align-items-end">

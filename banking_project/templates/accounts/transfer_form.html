@@ -11,88 +11,278 @@
                     <h5 class="mb-0">Перевод средств</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card mb-3">
-                                <div class="card-header bg-light">
-                                    <h6 class="mb-0">Счет отправителя</h6>
-                                </div>
-                                <div class="card-body">
-                                    <p><strong>Номер счета:</strong> {{ from_account.account_number }}</p>
-                                    <p><strong>Клиент:</strong> {{ from_account.client.get_full_name }}</p>
-                                    <p><strong>Доступный баланс:</strong> {{ from_account.balance }} {{ from_account.currency }}</p>
-                                </div>
+
+                    <!-- Отображение сообщений -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Проверка наличия счета отправителя -->
+                    {% if not from_account %}
+                        <div class="alert alert-warning">
+                            <h5 class="alert-heading">Выберите счет отправителя</h5>
+                            <p>Для выполнения перевода необходимо выбрать счет, с которого будет списана сумма.</p>
+                            <hr>
+                            <div class="mb-3">
+                                <label class="form-label">Выберите счет отправителя:</label>
+                                <select class="form-select" id="selectFromAccount">
+                                    <option value="">Выберите счет...</option>
+                                    {% for account in accounts %}
+                                    <option value="{{ account.id }}"
+                                            data-url="?from_account={{ account.id }}">
+                                        {{ account.account_number }} - {{ account.client.get_full_name|default:account.client.full_name }}
+                                        (Баланс: {{ account.balance|floatformat:2 }} {{ account.currency.code }})
+                                    </option>
+                                    {% empty %}
+                                    <option value="">Нет доступных счетов</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <a href="{% url 'accounts:account_list' %}" class="btn btn-secondary mt-2">Назад к списку счетов</a>
                         </div>
-                    </div>
 
-                    <form method="post">
-                        {% csrf_token %}
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const selectFromAccount = document.getElementById('selectFromAccount');
+                            selectFromAccount.addEventListener('change', function() {
+                                if (this.value) {
+                                    const selectedOption = this.options[this.selectedIndex];
+                                    const url = selectedOption.dataset.url;
+                                    if (url) {
+                                        window.location.href = url;
+                                    }
+                                }
+                            });
+                        });
+                        </script>
 
+                    {% else %}
+                        <!-- Информация о счете отправителя -->
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Счет получателя</label>
-                                    <select class="form-select" name="to_account" required>
-                                        <option value="">Выберите счет получателя</option>
-                                        {% for account in accounts %}
-                                        {% if account.id != from_account.id %}
-                                        <option value="{{ account.id }}">
-                                            {{ account.account_number }} ({{ account.client.get_full_name }})
-                                        </option>
-                                        {% endif %}
-                                        {% endfor %}
-                                    </select>
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Счет отправителя</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>Номер счета:</strong> {{ from_account.account_number }}</p>
+                                        <p><strong>Клиент:</strong> {{ from_account.client.get_full_name|default:from_account.client.full_name }}</p>
+                                        <p><strong>Доступный баланс:</strong>
+                                            <span id="accountBalance">{{ from_account.balance|floatformat:2 }}</span>
+                                            {{ from_account.currency.code }}
+                                        </p>
+                                        <p><strong>Валюта:</strong> {{ from_account.currency.code }} - {{ from_account.currency.name }}</p>
+                                    </div>
                                 </div>
                             </div>
+
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Сумма перевода</label>
-                                    <div class="input-group">
-                                        <input type="number" class="form-control" name="amount" required min="0.01" step="0.01">
-                                        <span class="input-group-text">{{ from_account.currency }}</span>
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Информация о переводе</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>Минимальная сумма:</strong> 1.00 {{ from_account.currency.code }}</p>
+                                        <p><strong>Комиссия:</strong> 1.5% от суммы перевода</p>
+                                        <p><strong>Лимит на операцию:</strong> 100,000.00 {{ from_account.currency.code }}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Назначение платежа</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Укажите назначение перевода" required></textarea>
-                        </div>
+                        <!-- Форма перевода -->
+                        <form method="post" id="transferForm">
+                            {% csrf_token %}
+                            <input type="hidden" name="from_account" value="{{ from_account.id }}">
 
-                        <div class="alert alert-info">
-                            <strong>Комиссия:</strong> <span id="feeAmount">0.00 {{ from_account.currency }}</span><br>
-                            <strong>Итоговая сумма:</strong> <span id="totalAmount">0.00 {{ from_account.currency }}</span>
-                        </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Счет получателя</label>
+                                        <select class="form-select" name="to_account" id="toAccount" required>
+                                            <option value="">Выберите счет получателя</option>
+                                            {% for account in accounts %}
+                                            {% if account.id != from_account.id %}
+                                            <option value="{{ account.id }}"
+                                                    data-currency="{{ account.currency.code }}"
+                                                    data-name="{{ account.client.get_full_name|default:account.client.full_name }}">
+                                                {{ account.account_number }} - {{ account.client.get_full_name|default:account.client.full_name }}
+                                                ({{ account.currency.code }})
+                                            </option>
+                                            {% endif %}
+                                            {% empty %}
+                                            <option value="">Нет доступных счетов для перевода</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text" id="toAccountInfo"></div>
+                                    </div>
+                                </div>
 
-                        <div class="d-grid gap-2">
-                            <a href="{% url 'accounts:account_detail' from_account.id %}" class="btn btn-secondary">Отмена</a>
-                            <button type="submit" class="btn btn-primary">Выполнить перевод</button>
-                        </div>
-                    </form>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Сумма перевода</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" name="amount" id="amount"
+                                                   required min="0.01" step="0.01"
+                                                   max="{{ from_account.balance|floatformat:2 }}"
+                                                   placeholder="0.00">
+                                            <span class="input-group-text">{{ from_account.currency.code }}</span>
+                                        </div>
+                                        <div class="form-text">
+                                            Доступно: <span id="availableBalance">{{ from_account.balance|floatformat:2 }}</span> {{ from_account.currency.code }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Назначение платежа</label>
+                                <textarea class="form-control" name="description" rows="3"
+                                          placeholder="Укажите назначение перевода (например: Перевод за услуги, Погашение долга и т.д.)"
+                                          maxlength="500" required></textarea>
+                                <div class="form-text">Максимум 500 символов</div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading">Сводка по переводу:</h6>
+                                <p><strong>Сумма перевода:</strong> <span id="transferAmount">0.00</span> {{ from_account.currency.code }}</p>
+                                <p><strong>Комиссия (1.5%):</strong> <span id="feeAmount">0.00</span> {{ from_account.currency.code }}</p>
+                                <hr>
+                                <p class="mb-0"><strong>Итого к списанию:</strong> <span id="totalAmount">0.00</span> {{ from_account.currency.code }}</p>
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex">
+                                <a href="{% url 'accounts:account_detail' from_account.id %}" class="btn btn-secondary me-md-2 flex-grow-1">
+                                    <i class="fas fa-arrow-left"></i> Отмена
+                                </a>
+                                <button type="submit" class="btn btn-primary flex-grow-1" id="submitButton">
+                                    <i class="fas fa-exchange-alt"></i> Выполнить перевод
+                                </button>
+                            </div>
+                        </form>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- JavaScript только для случая, когда есть from_account -->
+{% if from_account %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const amountInput = document.querySelector('input[name="amount"]');
-    const feeDisplay = document.getElementById('feeAmount');
-    const totalDisplay = document.getElementById('totalAmount');
+    const amountInput = document.getElementById('amount');
+    const toAccountSelect = document.getElementById('toAccount');
+    const toAccountInfo = document.getElementById('toAccountInfo');
+    const transferAmountSpan = document.getElementById('transferAmount');
+    const feeAmountSpan = document.getElementById('feeAmount');
+    const totalAmountSpan = document.getElementById('totalAmount');
+    const availableBalanceSpan = document.getElementById('availableBalance');
+    const submitButton = document.getElementById('submitButton');
+    const transferForm = document.getElementById('transferForm');
 
-    function calculateTransfer() {
-        const amount = parseFloat(amountInput.value) || 0;
-        const fee = amount * 0.015; // 1.5% комиссия
-        const total = amount + fee;
+    // Константы
+    const COMMISSION_RATE = 0.015; // 1.5%
+    const MAX_AMOUNT = 100000; // Максимальная сумма перевода
 
-        feeDisplay.textContent = fee.toFixed(2) + ' {{ from_account.currency }}';
-        totalDisplay.textContent = total.toFixed(2) + ' {{ from_account.currency }}';
+    // Функция форматирования чисел
+    function formatNumber(number) {
+        return parseFloat(number).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
 
-    amountInput.addEventListener('input', calculateTransfer);
+    // Функция расчета комиссии и итоговой суммы
+    function calculateTransfer() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const fee = amount * COMMISSION_RATE;
+        const total = amount + fee;
+
+        // Обновляем отображение
+        transferAmountSpan.textContent = formatNumber(amount);
+        feeAmountSpan.textContent = formatNumber(fee);
+        totalAmountSpan.textContent = formatNumber(total);
+
+        // Проверяем, достаточно ли средств
+        const availableBalance = parseFloat(availableBalanceSpan.textContent);
+        if (amount > availableBalance) {
+            amountInput.setCustomValidity('Сумма превышает доступный баланс');
+            submitButton.disabled = true;
+        } else if (amount > MAX_AMOUNT) {
+            amountInput.setCustomValidity(`Максимальная сумма перевода: ${formatNumber(MAX_AMOUNT)}`);
+            submitButton.disabled = true;
+        } else {
+            amountInput.setCustomValidity('');
+            submitButton.disabled = false;
+        }
+    }
+
+    // Обработчик изменения суммы
+    amountInput.addEventListener('input', function() {
+        calculateTransfer();
+    });
+
+    // Обработчик изменения счета получателя
+    toAccountSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption.value) {
+            const currency = selectedOption.dataset.currency;
+            const name = selectedOption.dataset.name;
+            toAccountInfo.textContent = `Валюта: ${currency}, Получатель: ${name}`;
+
+            // Проверяем валюту получателя
+            if (currency !== '{{ from_account.currency.code }}') {
+                toAccountInfo.innerHTML += '<br><span class="text-danger">Внимание! Перевод в другой валюте может потребовать конвертации.</span>';
+            }
+        } else {
+            toAccountInfo.textContent = '';
+        }
+    });
+
+    // Валидация формы перед отправкой
+    transferForm.addEventListener('submit', function(event) {
+        const amount = parseFloat(amountInput.value);
+        const availableBalance = parseFloat(availableBalanceSpan.textContent);
+
+        if (!amount || amount <= 0) {
+            event.preventDefault();
+            alert('Пожалуйста, введите корректную сумму перевода');
+            return;
+        }
+
+        if (amount > availableBalance) {
+            event.preventDefault();
+            alert('Недостаточно средств на счете отправителя');
+            return;
+        }
+
+        if (amount > MAX_AMOUNT) {
+            event.preventDefault();
+            alert(`Максимальная сумма одного перевода: ${formatNumber(MAX_AMOUNT)} {{ from_account.currency.code }}`);
+            return;
+        }
+
+        if (!toAccountSelect.value) {
+            event.preventDefault();
+            alert('Пожалуйста, выберите счет получателя');
+            return;
+        }
+
+        // Подтверждение перевода
+        if (!confirm(`Подтвердите перевод:\n\nСумма: ${formatNumber(amount)} {{ from_account.currency.code }}\nКомиссия: ${formatNumber(amount * COMMISSION_RATE)} {{ from_account.currency.code }}\nИтого: ${formatNumber(amount * (1 + COMMISSION_RATE))} {{ from_account.currency.code }}\n\nНажмите OK для подтверждения.`)) {
+            event.preventDefault();
+        }
+    });
+
+    // Инициализация расчета
+    calculateTransfer();
+
+    // Автофокус на поле суммы
+    amountInput.focus();
 });
 </script>
+{% endif %}
 {% endblock %}

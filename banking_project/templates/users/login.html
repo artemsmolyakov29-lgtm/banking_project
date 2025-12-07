@@ -1,51 +1,244 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load widget_tweaks %}
 
 {% block title %}Вход в систему - Банковская система{% endblock %}
 
+{% block extra_css %}
+<style>
+    .login-container {
+        min-height: calc(100vh - 200px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .login-card {
+        max-width: 400px;
+        width: 100%;
+        border: none;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .login-header {
+        background: linear-gradient(45deg, #2c3e50, #3498db);
+        color: white;
+        border-radius: 0.375rem 0.375rem 0 0;
+    }
+    .form-control:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
+<div class="login-container">
+    <div class="login-card">
+        <div class="card">
+            <div class="card-header login-header">
                 <h4 class="card-title mb-0 text-center">
-                    <i class="fas fa-sign-in-alt"></i> Вход в систему
+                    <i class="fas fa-sign-in-alt me-2"></i>Вход в систему
                 </h4>
             </div>
-            <div class="card-body">
+            <div class="card-body p-4">
+                {% if form.errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Неправильное имя пользователя или пароль. Пожалуйста, попробуйте снова.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+
                 <form method="post" novalidate>
                     {% csrf_token %}
 
-                    {% for field in form %}
+                    <!-- Поле для имени пользователя -->
                     <div class="mb-3">
-                        {{ field }}
-                        {% if field.errors %}
-                        <div class="text-danger small">
-                            {% for error in field.errors %}
-                            {{ error }}
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user me-1"></i>Имя пользователя
+                        </label>
+                        <input type="text"
+                               name="username"
+                               id="username"
+                               class="form-control form-control-lg"
+                               placeholder="Введите имя пользователя"
+                               required
+                               value="{{ form.username.value|default_if_none:'' }}">
+
+                        {% if form.username.errors %}
+                        <div class="text-danger small mt-1">
+                            {% for error in form.username.errors %}
+                            <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
                             {% endfor %}
                         </div>
                         {% endif %}
                     </div>
-                    {% endfor %}
 
-                    <div class="d-grid gap-2">
+                    <!-- Поле для пароля -->
+                    <div class="mb-4">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-lock me-1"></i>Пароль
+                        </label>
+                        <input type="password"
+                               name="password"
+                               id="password"
+                               class="form-control form-control-lg"
+                               placeholder="Введите пароль"
+                               required>
+                        <div class="form-text text-end">
+                            <a href="#" class="text-decoration-none">Забыли пароль?</a>
+                        </div>
+
+                        {% if form.password.errors %}
+                        <div class="text-danger small mt-1">
+                            {% for error in form.password.errors %}
+                            <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Чекбокс "Запомнить меня" -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                        <label class="form-check-label" for="rememberMe">Запомнить меня</label>
+                    </div>
+
+                    <!-- Кнопка отправки формы -->
+                    <div class="d-grid gap-2 mb-3">
                         <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-sign-in-alt"></i> Войти
+                            <i class="fas fa-sign-in-alt me-2"></i>Войти
                         </button>
                     </div>
+
+                    <!-- Скрытое поле для redirect -->
+                    <input type="hidden" name="next" value="{{ next }}">
                 </form>
 
-                <hr>
+                <hr class="my-4">
 
                 <div class="text-center">
-                    <p class="mb-0">Нет аккаунта?</p>
-                    <a href="{% url 'users:register' %}" class="btn btn-outline-primary btn-sm">
-                        Зарегистрироваться
+                    <p class="mb-3 text-muted">Нет учетной записи?</p>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'users:profile' %}" class="btn btn-outline-success">
+                        <i class="fas fa-user me-2"></i>Перейти в профиль
                     </a>
+                    {% else %}
+                    <a href="#" class="btn btn-outline-primary">
+                        <i class="fas fa-user-plus me-2"></i>Зарегистрироваться
+                    </a>
+                    {% endif %}
+                </div>
+
+                <div class="text-center mt-4">
+                    <p class="text-muted small">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        Ваши данные защищены. <a href="#" class="text-decoration-none">Политика конфиденциальности</a>
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Фокус на поле ввода имени пользователя
+        const usernameField = document.getElementById('username');
+        if (usernameField) {
+            usernameField.focus();
+        }
+
+        // Валидация формы
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const username = document.getElementById('username');
+                const password = document.getElementById('password');
+                let hasError = false;
+
+                // Валидация имени пользователя
+                if (!username || !username.value.trim()) {
+                    e.preventDefault();
+                    markFieldInvalid(username, 'Пожалуйста, введите имя пользователя');
+                    hasError = true;
+                } else {
+                    clearFieldError(username);
+                }
+
+                // Валидация пароля
+                if (!password || !password.value.trim()) {
+                    e.preventDefault();
+                    markFieldInvalid(password, 'Пожалуйста, введите пароль');
+                    hasError = true;
+                } else {
+                    clearFieldError(password);
+                }
+
+                // Если есть ошибки, показываем общее сообщение
+                if (hasError) {
+                    // Удаляем старые уведомления об ошибках
+                    const oldAlert = document.querySelector('.alert.alert-danger:not(.alert-dismissible)');
+                    if (oldAlert) oldAlert.remove();
+
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-danger mt-3';
+                    alertDiv.innerHTML = `
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Пожалуйста, заполните все обязательные поля.
+                    `;
+                    form.prepend(alertDiv);
+                }
+            });
+        }
+
+        // Удаление ошибок при вводе
+        const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                clearFieldError(this);
+
+                // Удаляем общее сообщение об ошибке, если оно есть
+                const generalError = document.querySelector('.alert.alert-danger:not(.alert-dismissible)');
+                if (generalError && generalError.textContent.includes('Пожалуйста, заполните')) {
+                    generalError.remove();
+                }
+            });
+        });
+
+        // Функция для отметки поля как невалидного
+        function markFieldInvalid(field, message) {
+            if (!field) return;
+
+            field.classList.add('is-invalid');
+
+            // Удаляем старую ошибку
+            const oldError = field.parentElement.querySelector('.invalid-feedback');
+            if (oldError) oldError.remove();
+
+            // Создаем новое сообщение об ошибке
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'invalid-feedback';
+            errorDiv.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i>${message}`;
+            field.parentElement.appendChild(errorDiv);
+        }
+
+        // Функция для очистки ошибок поля
+        function clearFieldError(field) {
+            field.classList.remove('is-invalid');
+            const errorDiv = field.parentElement.querySelector('.invalid-feedback');
+            if (errorDiv) errorDiv.remove();
+        }
+
+        // Автоматическое скрытие уведомлений через 5 секунд
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    });
+</script>
 {% endblock %}

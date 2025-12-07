@@ -6,9 +6,10 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0">
-        <i class="fas fa-wallet me-2"></i>Счета
+        <i class="fas fa-wallet me-2"></i>
+        {% if user.role == 'client' %}Мои счета{% else %}Счета{% endif %}
     </h1>
-    {% if user.role in 'employee,admin' %}
+    {% if user.role in 'employee,admin' or user.role == 'client' %}
     <a href="{% url 'accounts:account_create' %}" class="btn btn-primary">
         <i class="fas fa-plus me-1"></i>Открыть счет
     </a>
@@ -27,6 +28,57 @@
 </div>
 {% endif %}
 
+<!-- Статистика для клиентов -->
+{% if user.role == 'client' and total_balance %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ active_accounts }}</h4>
+                        <p class="mb-0">Активных счетов</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-wallet fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ total_balance|floatformat:2 }} ₽</h4>
+                        <p class="mb-0">Общий баланс</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-line fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ blocked_accounts }}</h4>
+                        <p class="mb-0">Заблокировано</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-ban fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     {% for account in accounts %}
     <div class="col-md-6 col-lg-4 mb-4">
@@ -40,9 +92,11 @@
             <div class="card-body">
                 <h6 class="card-title">{{ account.account_number }}</h6>
                 <p class="card-text">
-                    <strong>Баланс:</strong> {{ account.balance }} {{ account.currency }}<br>
+                    <strong>Баланс:</strong> {{ account.balance|floatformat:2 }} {{ account.currency.code }}<br>
                     <strong>Владелец:</strong> {{ account.client.full_name }}<br>
+                    {% if account.interest_rate %}
                     <strong>Процентная ставка:</strong> {{ account.interest_rate }}%
+                    {% endif %}
                 </p>
             </div>
             <div class="card-footer">
@@ -50,7 +104,7 @@
                     <a href="{% url 'accounts:account_detail' account.pk %}" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-eye"></i>
                     </a>
-                    {% if user.role in 'employee,admin' %}
+                    {% if user.role in 'employee,admin' or account.client.user == user %}
                     <a href="{% url 'accounts:account_update' account.pk %}" class="btn btn-sm btn-outline-secondary">
                         <i class="fas fa-edit"></i>
                     </a>
@@ -69,7 +123,7 @@
         <div class="text-center py-5">
             <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
             <p class="text-muted">Счета не найдены</p>
-            {% if user.role in 'employee,admin' %}
+            {% if user.role in 'employee,admin' or user.role == 'client' %}
             <a href="{% url 'accounts:account_create' %}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i>Открыть первый счет
             </a>
@@ -78,4 +132,35 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Пагинация -->
+{% if page_obj.has_other_pages %}
+<nav aria-label="Навигация по страницам">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Назад">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Вперед">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
 {% endblock %}
